@@ -56,6 +56,8 @@ class RelayEngine(
     /** Registers a packet we originate so that it is never re-forwarded back to us. */
     fun markOriginated(p: Packet, nowMs: Long) { seen[p.msgId.toHex()] = nowMs }
 
+    fun markOriginatedIfNew(p: Packet, nowMs: Long) { if (!seen.containsKey(p.msgId.toHex())) markOriginated(p, nowMs) }
+
     fun onReceive(raw: ByteArray, nowMs: Long): RelayDecision {
         seen.entries.removeAll { nowMs - it.value >= cacheTtlMs }
         val p = Packet.decode(raw) ?: return RelayDecision.Drop("invalid")
