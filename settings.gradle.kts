@@ -129,6 +129,7 @@ include(":lib:password-manager")
 include(":lib:storage")
 include(":lib:remote-config")
 include(":lib:locale")
+include(":lib:offline-core")
 
 // Feature modules
 include(":feature:app-settings")
