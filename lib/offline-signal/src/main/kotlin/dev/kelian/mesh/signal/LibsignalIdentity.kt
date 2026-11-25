@@ -15,8 +15,8 @@ import java.security.SecureRandom
  * derived from it deterministically, so a restored phrase gives back the same public key.
  */
 class LibsignalIdentity private constructor(val seed: ByteArray, internal val privateKey: ECPrivateKey) : IdentitySigner {
-    override val publicKey: ByteArray = privateKey.publicKey.serialize()
-    val identityKeyPair: IdentityKeyPair = IdentityKeyPair(IdentityKey(privateKey.publicKey), privateKey)
+    override val publicKey: ByteArray = privateKey.getPublicKey().serialize()
+    val identityKeyPair: IdentityKeyPair = IdentityKeyPair(IdentityKey(privateKey.getPublicKey()), privateKey)
 
     override fun sign(message: ByteArray): ByteArray = privateKey.calculateSignature(message)
 
