@@ -17,10 +17,10 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
-      - name: Unit tests (offline-core) and compile BLE module (offline-ble)
+      - name: Unit tests (offline-core, offline-signal) and compile BLE module (offline-ble)
         run: |
           set -o pipefail
-          ./gradlew :lib:offline-core:test :lib:offline-ble:compileDebugKotlin --no-daemon --stacktrace 2>&1 | tee gradle.log
+          ./gradlew :lib:offline-core:test :lib:offline-signal:test :lib:offline-ble:compileDebugKotlin --no-daemon --stacktrace 2>&1 | tee gradle.log
       - name: Expose Gradle errors as annotations
         if: failure()
         run: |
@@ -35,4 +35,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: offline-core-test-report
-          path: lib/offline-core/build/reports/tests/test
+          path: |
+            lib/offline-core/build/reports/tests/test
+            lib/offline-signal/build/reports/tests/test

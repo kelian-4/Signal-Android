@@ -232,4 +232,14 @@ class MeshEngineTest {
         assertFalse(dev.kelian.mesh.core.protocol.shouldConnectMesh(true, 0, 10, 0, 50, false))
         assertFalse(dev.kelian.mesh.core.protocol.shouldConnectMesh(true, 0, 10, 0, 0, true))
     }
+
+    @Test fun sendWithoutSessionIsReportedNotCrashed() {
+        radio = SimRadio()
+        val noSession = object : SessionCipher by FakeCipher(Identity.generate().publicKey) { override fun canEncrypt(peerPk: ByteArray) = false }
+        val id = Identity.generate(); val other = Identity.generate()
+        val a = MeshEngine(id, "A", noSession, radio.sinkFor("A"), { radio.clock[0] })
+        a.addContact("o", QrPayload.parse(QrPayload.create(other, "O", radio.clock[0]).encode(), radio.clock[0])!!)
+        assertTrue(a.sendText("o", "x") is SendResult.NoSession)
+        assertEquals(0, a.pendingCount())
+    }
 }

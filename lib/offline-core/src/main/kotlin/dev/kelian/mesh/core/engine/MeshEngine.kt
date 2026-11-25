@@ -8,7 +8,7 @@ import dev.kelian.mesh.core.backup.BackupBundle
 import dev.kelian.mesh.core.backup.BackupCodec
 import dev.kelian.mesh.core.backup.BackupContact
 import dev.kelian.mesh.core.backup.BackupMessage
-import dev.kelian.mesh.core.identity.Identity
+import dev.kelian.mesh.core.identity.IdentitySigner
 import dev.kelian.mesh.core.link.AckWatchdog
 import dev.kelian.mesh.core.link.WatchdogAction
 import dev.kelian.mesh.core.outbox.InMemoryOutboxStore
@@ -39,6 +39,8 @@ import java.security.SecureRandom
  * public key only. The engine never sees keys, only opaque bytes.
  */
 interface SessionCipher {
+    /** False while no session exists with [peerPk] (the prekey bundle has not been exchanged yet). */
+    fun canEncrypt(peerPk: ByteArray): Boolean = true
     fun encrypt(peerPk: ByteArray, plain: ByteArray): ByteArray
     fun decrypt(peerPk: ByteArray, data: ByteArray): ByteArray?
     fun seal(recipientPk: ByteArray, plain: ByteArray): ByteArray
@@ -60,6 +62,7 @@ sealed class SendResult {
     class Queued(val msgIdHex: String) : SendResult()
     class Rejected(val verdict: Verdict) : SendResult()
     object UnknownContact : SendResult()
+    object NoSession : SendResult()
 }
 
 object Routing {
@@ -92,7 +95,7 @@ class Contact(val id: String, val nickname: String, var publicKey: ByteArray, va
  * watchdog. No threads, no Android: the caller feeds frames in and reads [events].
  */
 class MeshEngine(
-    val identity: Identity,
+    val identity: IdentitySigner,
     val nickname: String,
     private val cipher: SessionCipher,
     private val sink: LinkSink,
@@ -150,12 +153,13 @@ class MeshEngine(
 
     private fun envelope(kind: Int, body: ByteArray, now: Long): ByteArray {
         val bo = ByteArrayOutputStream(); val o = DataOutputStream(bo)
-        o.writeByte(kind); o.write(identity.publicKey); o.writeLong(now); o.writeUTF(nickname); o.writeInt(body.size); o.write(body)
+        o.writeByte(kind); o.writeByte(identity.publicKey.size); o.write(identity.publicKey); o.writeLong(now); o.writeUTF(nickname); o.writeInt(body.size); o.write(body)
         return bo.toByteArray()
     }
 
     fun sendText(contactId: String, text: String): SendResult {
         val c = contacts[contactId] ?: return SendResult.UnknownContact
+        if (!cipher.canEncrypt(c.publicKey)) return SendResult.NoSession
         val now = clock()
         val v = abuse.checkOutgoing(contactId, standing(contactId), OutgoingContent(text), now)
         if (v != Verdict.ALLOW) return SendResult.Rejected(v)
@@ -286,7 +290,7 @@ class MeshEngine(
 
     private fun handleEnvelope(plain: ByteArray, from: Contact?, p: Packet) {
         val i = java.io.DataInputStream(plain.inputStream())
-        val kind = i.readUnsignedByte(); val pk = ByteArray(32).also { i.readFully(it) }; i.readLong(); val nick = i.readUTF()
+        val kind = i.readUnsignedByte(); val pk = ByteArray(i.readUnsignedByte().also { require(it in 32..64) }).also { i.readFully(it) }; i.readLong(); val nick = i.readUTF()
         val body = ByteArray(i.readInt()).also { i.readFully(it) }
         when (kind) {
             K_TEXT -> if (from != null && from.publicKey.contentEquals(pk)) {

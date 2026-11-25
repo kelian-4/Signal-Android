@@ -2,6 +2,7 @@ package dev.kelian.mesh.core.verify
 
 import dev.kelian.mesh.core.identity.Ed25519
 import dev.kelian.mesh.core.identity.IdentitySigner
+import dev.kelian.mesh.core.identity.SignatureVerifier
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
@@ -14,7 +15,7 @@ import java.util.Base64
 class QrPayload(val publicKey: ByteArray, val nickname: String, val timestampMs: Long, val signature: ByteArray) {
     fun encode(): String {
         val bo = ByteArrayOutputStream(); val o = DataOutputStream(bo)
-        o.writeByte(1); o.write(publicKey); o.writeUTF(nickname); o.writeLong(timestampMs); o.write(signature)
+        o.writeByte(2); o.writeByte(publicKey.size); o.write(publicKey); o.writeUTF(nickname); o.writeLong(timestampMs); o.writeByte(signature.size); o.write(signature)
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bo.toByteArray())
     }
 
@@ -30,15 +31,17 @@ class QrPayload(val publicKey: ByteArray, val nickname: String, val timestampMs:
             QrPayload(signer.publicKey, nickname, nowMs, signer.sign(signedBytes(signer.publicKey, nickname, nowMs)))
 
         /** Returns null if malformed, badly signed, too old or from the future. */
-        fun parse(text: String, nowMs: Long): QrPayload? = runCatching {
+        fun parse(text: String, nowMs: Long, verifier: SignatureVerifier = Ed25519): QrPayload? = runCatching {
             val i = DataInputStream(ByteArrayInputStream(Base64.getUrlDecoder().decode(text)))
-            if (i.readUnsignedByte() != 1) return null
-            val pk = ByteArray(32).also { i.readFully(it) }
+            if (i.readUnsignedByte() != 2) return null
+            val pkLen = i.readUnsignedByte(); if (pkLen !in 32..64) return null
+            val pk = ByteArray(pkLen).also { i.readFully(it) }
             val nick = i.readUTF(); val ts = i.readLong()
-            val sig = ByteArray(64).also { i.readFully(it) }
+            val sigLen = i.readUnsignedByte(); if (sigLen !in 32..128) return null
+            val sig = ByteArray(sigLen).also { i.readFully(it) }
             if (i.available() != 0 || nick.length > 64) return null
             if (nowMs - ts > MAX_AGE_MS || ts - nowMs > 60_000) return null
-            if (!Ed25519.verify(pk, signedBytes(pk, nick, ts), sig)) return null
+            if (!verifier.verify(pk, signedBytes(pk, nick, ts), sig)) return null
             QrPayload(pk, nick, ts, sig)
         }.getOrNull()
     }
@@ -54,8 +57,8 @@ object Challenge {
     fun respond(signer: IdentitySigner, challenge: ByteArray, scannerPk: ByteArray) =
         signer.sign(bytes(challenge, scannerPk, signer.publicKey))
 
-    fun verify(scannedPk: ByteArray, challenge: ByteArray, scannerPk: ByteArray, response: ByteArray) =
-        Ed25519.verify(scannedPk, bytes(challenge, scannerPk, scannedPk), response)
+    fun verify(scannedPk: ByteArray, challenge: ByteArray, scannerPk: ByteArray, response: ByteArray, verifier: SignatureVerifier = Ed25519) =
+        verifier.verify(scannedPk, bytes(challenge, scannerPk, scannedPk), response)
 }
 
 /** 60-digit safety number, identical on both phones, changes if either key changes. */

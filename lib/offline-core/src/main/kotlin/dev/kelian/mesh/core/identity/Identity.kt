@@ -20,9 +20,14 @@ interface IdentitySigner {
     fun sign(message: ByteArray): ByteArray
 }
 
-object Ed25519 {
+/** Signature check used for QR codes, challenges and prekey bundles. Android plugs libsignal's XEd25519 here. */
+fun interface SignatureVerifier {
+    fun verify(publicKey: ByteArray, message: ByteArray, signature: ByteArray): Boolean
+}
+
+object Ed25519 : SignatureVerifier {
     /** Verifies [signature] over [message] with a raw 32-byte public key. Never throws. */
-    fun verify(publicKey: ByteArray, message: ByteArray, signature: ByteArray): Boolean = runCatching {
+    override fun verify(publicKey: ByteArray, message: ByteArray, signature: ByteArray): Boolean = runCatching {
         if (publicKey.size != 32 || signature.size != 64) return false
         val s = Signature.getInstance("Ed25519")
         s.initVerify(toPublicKey(publicKey)); s.update(message); s.verify(signature)

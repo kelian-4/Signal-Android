@@ -131,6 +131,7 @@ include(":lib:remote-config")
 include(":lib:locale")
 include(":lib:offline-core")
 include(":lib:offline-ble")
+include(":lib:offline-signal")
 
 // Feature modules
 include(":feature:app-settings")

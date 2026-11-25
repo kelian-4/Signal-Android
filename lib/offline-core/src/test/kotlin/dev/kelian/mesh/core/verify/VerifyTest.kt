@@ -67,4 +67,29 @@ class VerifyTest {
         val book = ContactTrustBook(); book.add("bob", bob.publicKey)
         assertFalse(book.onKeySeen("bob", alice.publicKey)!!.wasVerified)
     }
+
+    /** Stand-in for libsignal's Curve25519/XEd25519: 33-byte keys, 64-byte signatures, NOT secure. */
+    private class CurveLikeSigner(seed: Int) : dev.kelian.mesh.core.identity.IdentitySigner {
+        override val publicKey = ByteArray(33) { (if (it == 0) 5 else seed + it).toByte() }
+        override fun sign(message: ByteArray) = CurveLikeScheme.sig(publicKey, message)
+    }
+    private object CurveLikeScheme : dev.kelian.mesh.core.identity.SignatureVerifier {
+        fun sig(pk: ByteArray, m: ByteArray) = java.security.MessageDigest.getInstance("SHA-512").digest(pk + m)
+        override fun verify(publicKey: ByteArray, message: ByteArray, signature: ByteArray) = sig(publicKey, message).contentEquals(signature)
+    }
+
+    @Test fun otherSignatureSchemesAndKeyLengthsPlugIn() {
+        val a = CurveLikeSigner(1); val b = CurveLikeSigner(50)
+        val qr = QrPayload.create(a, "Awa", 5_000).encode()
+        assertNull(QrPayload.parse(qr, 5_100)) // default Ed25519 rejects a foreign scheme
+        val p = QrPayload.parse(qr, 5_100, CurveLikeScheme)!!
+        assertEquals(33, p.publicKey.size); assertEquals("Awa", p.nickname)
+        val ch = Challenge.newChallenge()
+        assertTrue(Challenge.verify(a.publicKey, ch, b.publicKey, Challenge.respond(a, ch, b.publicKey), CurveLikeScheme))
+        assertFalse(Challenge.verify(b.publicKey, ch, b.publicKey, Challenge.respond(a, ch, b.publicKey), CurveLikeScheme))
+        val bundle = dev.kelian.mesh.core.prekeys.PreKeyBundle.create(a, 3, ByteArray(33) { 1 }, listOf(7 to ByteArray(33) { 2 }), ByteArray(1600) { 9 })
+        val back = dev.kelian.mesh.core.prekeys.PreKeyBundle.parse(bundle.encode(), CurveLikeScheme)!!
+        assertEquals(1600, back.extra.size); assertEquals(33, back.identityKey.size)
+        assertNull(dev.kelian.mesh.core.prekeys.PreKeyBundle.parse(bundle.encode())) // default scheme rejects it
+    }
 }

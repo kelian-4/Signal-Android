@@ -5,7 +5,7 @@ import dev.kelian.mesh.core.engine.LinkSink
 import dev.kelian.mesh.core.engine.MeshEngine
 import dev.kelian.mesh.core.engine.MeshEvent
 import dev.kelian.mesh.core.engine.SessionCipher
-import dev.kelian.mesh.core.identity.Identity
+import dev.kelian.mesh.core.identity.IdentitySigner
 import dev.kelian.mesh.core.outbox.FileOutboxStore
 import java.io.File
 
@@ -16,7 +16,7 @@ import java.io.File
  */
 class MeshRuntime(
     context: Context,
-    identity: Identity,
+    identity: IdentitySigner,
     nickname: String,
     cipher: SessionCipher,
     private val onEvent: (MeshEvent) -> Unit,
