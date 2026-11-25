@@ -129,7 +129,10 @@ class MeshEngine(
         trust.add(contactId, qr.publicKey)
     }
 
-    fun markVerified(contactId: String): Boolean = trust.markVerified(contactId, contacts[contactId]?.publicKey ?: return false)
+    fun markVerified(contactId: String): Boolean {
+        val key = contacts[contactId]?.publicKey ?: return false
+        return trust.markVerified(contactId, key)
+    }
 
     /** Called when a session handshake authenticates [key] for [contactId] (libsignal identity key). */
     fun onAuthenticatedKey(contactId: String, key: ByteArray) {
