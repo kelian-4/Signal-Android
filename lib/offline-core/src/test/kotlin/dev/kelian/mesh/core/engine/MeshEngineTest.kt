@@ -199,4 +199,37 @@ class MeshEngineTest {
         assertNull(PreKeyBundle.parse(java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(raw)))
         assertNull(PreKeyBundle.parse("zzz")); assertNull(PreKeyBundle.parse(""))
     }
+
+    @Test fun storeAndForwardWhenTheNextHopAppearsLater() {
+        radio = SimRadio(); val a = engine("A"); val b = engine("B"); val c = engine("C")
+        meetAndVerify(a, "a", b, "b")
+        radio.connect("A", { a }, "toC", "C", { c }, "toA")
+        a.sendText("b", "arrive plus tard"); radio.run()
+        assertTrue(c.wantsConnection()) // C holds a packet it cannot forward yet: it should open a link
+        assertEquals(0, b.events.size)
+        radio.connect("C", { c }, "toB", "B", { b }, "toC"); radio.run()
+        assertEquals("arrive plus tard", b.events.filterIsInstance<MeshEvent.Text>().single().text)
+        assertEquals(0, a.pendingCount())
+    }
+
+    @Test fun smallMtuLinksForceFragmentation() {
+        radio = SimRadio(); val a = engine("A"); val b = engine("B")
+        meetAndVerify(a, "a", b, "b")
+        val long = "x".repeat(900)
+        radio.connect("A", { a }, "L", "B", { b }, "L")
+        a.onLinkDown("L"); b.onLinkDown("L"); a.onLinkUp("L", 20); b.onLinkUp("L", 20)
+        val before = radio.frames
+        a.sendText("b", long); radio.run()
+        assertTrue(radio.frames - before > 40) // 900+ bytes in 20-byte frames
+        assertEquals(long, b.events.filterIsInstance<MeshEvent.Text>().single().text)
+    }
+
+    @Test fun meshConnectionPolicyKeepsRelayLinksOpenButStaysOnDemand() {
+        assertTrue(dev.kelian.mesh.core.protocol.shouldConnectMesh(true, 1, 10, 0, 0, false))
+        assertFalse(dev.kelian.mesh.core.protocol.shouldConnectMesh(false, 0, 10, 0, 0, false))
+        assertFalse(dev.kelian.mesh.core.protocol.shouldConnectMesh(true, 3, 10, 0, 0, false))
+        assertFalse(dev.kelian.mesh.core.protocol.shouldConnectMesh(true, 0, 10, 20, 0, false))
+        assertFalse(dev.kelian.mesh.core.protocol.shouldConnectMesh(true, 0, 10, 0, 50, false))
+        assertFalse(dev.kelian.mesh.core.protocol.shouldConnectMesh(true, 0, 10, 0, 0, true))
+    }
 }

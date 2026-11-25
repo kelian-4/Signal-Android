@@ -82,7 +82,8 @@ object Routing {
 private const val K_TEXT = 1
 private const val K_REQUEST = 2
 private const val K_DELIVERED = 3
-private const val FRAME_ACK_TAG = "hop"
+private const val BACKLOG_TTL_MS = 10L * 60 * 1000
+private const val MAX_BACKLOG = 64
 
 class Contact(val id: String, val nickname: String, var publicKey: ByteArray, var accepted: Boolean)
 
@@ -107,6 +108,9 @@ class MeshEngine(
     private val outbox = Outbox(outboxStore)
     private val contacts = LinkedHashMap<String, Contact>()
     private val links = LinkedHashSet<String>()
+    private val linkMaxFrame = HashMap<String, Int>()
+    private class Backlog(val packet: Packet, val fromLink: String, val atMs: Long)
+    private val relayBacklog = ArrayDeque<Backlog>()
     private val reassemblers = HashMap<String, Reassembler>()
     private val watchdogs = HashMap<String, AckWatchdog>()
     private val relay = RelayEngine({ ownTags() })
@@ -178,8 +182,27 @@ class MeshEngine(
         return id.toHex()
     }
 
-    fun onLinkUp(linkId: String) { links.add(linkId); reassemblers[linkId] = Reassembler(); watchdogs[linkId] = AckWatchdog(); flush() }
-    fun onLinkDown(linkId: String) { links.remove(linkId); reassemblers.remove(linkId); watchdogs.remove(linkId) }
+    /** [maxFrame] = ATT payload of this link (MTU - 3); every frame sent on it is at most that big. */
+    fun onLinkUp(linkId: String, maxFrame: Int = maxFrameSize) {
+        require(maxFrame >= 20) { "frame size too small" }
+        links.add(linkId); linkMaxFrame[linkId] = maxFrame
+        reassemblers[linkId] = Reassembler(); watchdogs[linkId] = AckWatchdog()
+        flush()
+        val now = clock()
+        relayBacklog.removeAll { now - it.atMs > BACKLOG_TTL_MS }
+        for (b in relayBacklog.toList()) if (b.fromLink != linkId) sendPacket(linkId, b.packet)
+    }
+
+    fun onLinkDown(linkId: String) { links.remove(linkId); linkMaxFrame.remove(linkId); reassemblers.remove(linkId); watchdogs.remove(linkId) }
+
+    /** True when the radio should try to open connections: something waits to be sent or relayed. */
+    fun wantsConnection(): Boolean {
+        val now = clock()
+        relayBacklog.removeAll { now - it.atMs > BACKLOG_TTL_MS }
+        return outbox.pending().isNotEmpty() || relayBacklog.isNotEmpty()
+    }
+
+    fun linkCount() = links.size
 
     /** Re-sends everything not yet acknowledged end to end, on every link. */
     fun flush() { for (e in outbox.pending()) for (l in links) transmit(l, Packet(e.msgIdHex.hexBytes(), e.destTagHex.hexBytes(), MAX_TTL, e.payload)); }
@@ -192,7 +215,7 @@ class MeshEngine(
     }
 
     private fun sendPacket(link: String, p: Packet) {
-        val frames = fragment(p.encode(), maxFrameSize, p.msgId)
+        val frames = fragment(p.encode(), linkMaxFrame[link] ?: maxFrameSize, p.msgId)
         watchdogs[link]?.onSent(p.msgId.toHex(), clock())
         for (f in frames) sink.sendFrame(link, f.encode())
     }
@@ -220,7 +243,15 @@ class MeshEngine(
 
     private fun onPacket(fromLink: String, raw: ByteArray) {
         when (val d = relay.onReceive(raw, clock())) {
-            is RelayDecision.Forward -> for (l in links) if (l != fromLink) sendPacket(l, d.packet)
+            is RelayDecision.Forward -> {
+                val targets = links.filter { it != fromLink }
+                for (l in targets) sendPacket(l, d.packet)
+                // nobody to forward to yet: keep it, a connection will be opened for it (store-and-forward)
+                if (targets.isEmpty()) {
+                    relayBacklog.addLast(Backlog(d.packet, fromLink, clock()))
+                    while (relayBacklog.size > MAX_BACKLOG) relayBacklog.removeFirst()
+                }
+            }
             is RelayDecision.Deliver -> deliver(d.packet)
             is RelayDecision.Drop -> if (d.reason == "duplicate") reAckIfOurs(raw)
         }

@@ -130,6 +130,7 @@ include(":lib:storage")
 include(":lib:remote-config")
 include(":lib:locale")
 include(":lib:offline-core")
+include(":lib:offline-ble")
 
 // Feature modules
 include(":feature:app-settings")
