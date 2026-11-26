@@ -2,7 +2,7 @@
 
 | Élément | Action | Statut |
 |---|---|---|
-| Permission INTERNET | retirée du manifeste fusionné (`tools:node="remove"`) | fait, compilé en CI, non exécuté sur téléphone |
+| Permission INTERNET | retirée du manifeste fusionné (`tools:node="remove"`) | fait, le build complet passe en CI, non exécuté sur téléphone |
 | applicationId | `app.messagerie.mesh` (plus celui de Signal) | fait |
 | Nom de l'app | « Mesh » (chaîne par défaut) | fait |
 | Icône par défaut | icône neutre (vecteur + PNG) | fait |

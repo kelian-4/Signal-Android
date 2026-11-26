@@ -1,25 +1,34 @@
 # Status of the offline fork (Android)
 
-## Done and verified (unit tests, run locally with `lib/offline-core/tools/run-local.sh`)
-`lib/offline-core` (pure Kotlin/JVM, 43 tests): frames, fragmentation, reassembly and de-duplication
-(shared `vectors.json` from the lab repo), connection policy, BLE relay with TTL + bounded dedup cache
-(simulated nodes), persisted outbox, ACK watchdog, link diagnostics, device identity, 24-word BIP-39
-phrase, encrypted backup (no session state), signed QR + challenge-response + security code, trust
-levels with key-change alert, anti-abuse rules.
+Legend: **tested** = unit tests pass (local + CI) · **compiled** = builds in CI, never run · **not done**.
 
-## Done and compiled (CI), not run on a phone
-`lib/offline-ble` (Android library): BLE link layer ported from the field-tested lab engine (GATT server +
-client, serialized operations, error 133 backoff, MTU reuse, on-demand mesh connection policy, ephemeral
-INFO id, watchdog-driven link repair), foreground service (connectedDevice), battery-exemption helper,
-permission list, per-event diagnostics CSV, and `MeshRuntime` gluing the core engine to the radio.
+## Tested (unit tests, CI and `lib/offline-core/tools/run-local.sh`)
+- `lib/offline-core` (56 tests, pure Kotlin): frames, fragmentation, reassembly, dedup (shared `vectors.json`),
+  connection policies (lab + mesh), relay with TTL / bounded cache / store-and-forward, persisted outbox,
+  ACK watchdog, link diagnostics, BIP-39 24-word phrase, encrypted backup (no session state), signed QR,
+  challenge-response, security code, trust levels + key-change alert, anti-abuse rules, `MeshEngine`
+  end-to-end in simulation, pluggable signature scheme.
+- `lib/offline-signal` (libsignal 0.108, real native library): identity restorable from the phrase,
+  offline prekey bundle (~2.5 k chars, fits one QR), Double Ratchet sessions that survive a restart,
+  HPKE-sealed contact requests, full text exchange through a relay that cannot read it.
 
-## NOT done (nothing below was changed in the app yet)
-- Rename of the app (applicationId, name, icon), removal of server-dependent features, removal of the
-  INTERNET permission, offline profile start (scope A). No removal is recorded yet in `docs/REMOVED.md`
-  because none was made.
-- Wiring of `MeshRuntime` into the Signal app (identity storage, start/stop, permission screens).
-- libsignal sessions and offline prekey exchange; wiring of identity/backup/verification into the Signal UI.
-- Contact-request screens.
+## Compiled only (never run on a phone)
+- `lib/offline-ble`: BLE link layer ported from the field-tested lab engine, foreground service,
+  battery-exemption helper, permission list, diagnostics CSV, `MeshRuntime`.
+- The whole app builds (`:Signal-Android:assemblePlayProdDebug`) with: new applicationId
+  `app.messagerie.mesh`, name "Mesh", neutral icon, INTERNET permission removed.
 
-## Not verifiable without a phone
-Everything Bluetooth, battery, background behaviour, relay across 3 real phones.
+## Not done
+- Starting the app offline with a local profile: the Signal registration flow is still there and cannot
+  work without a server (and without the INTERNET permission). Server-dependent features are not removed
+  yet (see `docs/REMOVED.md`).
+- `MeshRuntime` / `LibsignalSessionCipher` are not wired into the Signal UI: no screens for identity
+  creation, QR display/scan, verification badge, key-change alert, recovery phrase, backup export/import,
+  contact requests; the Signal message pipeline does not use the mesh transport yet.
+- Signal's alternative launcher icons and other Signal branding assets are still present.
+- Everything radio-related on real phones: see `docs/HARDWARE_TESTS.md`.
+
+## Known risks
+- QR of ~2.5 k characters is dense: scanning reliability on cheap phone cameras is untested
+  (fallback: send the bundle over close-range BLE after scanning the compact signed QR).
+- Removing server code from ~6,900 Signal source files can only be validated by build + a real phone.
