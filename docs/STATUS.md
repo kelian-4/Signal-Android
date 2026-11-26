@@ -15,16 +15,19 @@ Legend: **tested** = unit tests pass (local + CI) · **compiled** = builds in CI
 ## Compiled only (never run on a phone)
 - `lib/offline-ble`: BLE link layer ported from the field-tested lab engine, foreground service,
   battery-exemption helper, permission list, diagnostics CSV, `MeshRuntime`.
+- Launcher screen `MeshMainActivity` (plain Android views): identity creation with a nickname, 24-word recovery
+  phrase display, restore from a phrase, seed encrypted with an Android Keystore key, Bluetooth permission
+  request, battery-exemption request, start/stop of the foreground BLE service, live link status. The
+  `RoutingActivity` launcher alias now points to it instead of Signal's `MainActivity`.
 - The whole app builds (`:Signal-Android:assemblePlayProdDebug`) with: new applicationId
   `app.messagerie.mesh`, name "Mesh", neutral icon, INTERNET permission removed.
 
 ## Not done
-- Starting the app offline with a local profile: the Signal registration flow is still there and cannot
-  work without a server (and without the INTERNET permission). Server-dependent features are not removed
-  yet (see `docs/REMOVED.md`).
-- `MeshRuntime` / `LibsignalSessionCipher` are not wired into the Signal UI: no screens for identity
-  creation, QR display/scan, verification badge, key-change alert, recovery phrase, backup export/import,
-  contact requests; the Signal message pipeline does not use the mesh transport yet.
+- Signal's own code still runs at startup (`ApplicationContext`) and its server-dependent features are not
+  removed (see `docs/REMOVED.md`): how the app behaves at launch without INTERNET is untested.
+- Mesh screens still missing: QR display/scan with the signed QR and prekey bundle, chat, verification badge,
+  key-change alert, backup export/import, contact requests. `MeshRuntime` events are not consumed yet, so
+  no message can be sent from the UI. Signal's conversation UI does not use the mesh transport.
 - Signal's alternative launcher icons and other Signal branding assets are still present.
 - Everything radio-related on real phones: see `docs/HARDWARE_TESTS.md`.
 
