@@ -51,7 +51,7 @@ jobs:
       - name: Build the app (debug APK)
         run: |
           set -o pipefail
-          ./gradlew :app:assemblePlayProdDebug --no-daemon --stacktrace 2>&1 | tee gradle-app.log
+          ./gradlew :Signal-Android:assemblePlayProdDebug --no-daemon --stacktrace 2>&1 | tee gradle-app.log
       - name: Expose Gradle errors as annotations
         if: failure()
         run: |
