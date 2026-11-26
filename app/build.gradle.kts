@@ -721,6 +721,8 @@ dependencies {
   implementation(project(":lib:password-manager"))
   implementation(project(":lib:photoview"))
   implementation(project(":lib:qr"))
+  implementation(project(":lib:offline-ble"))
+  implementation(project(":lib:offline-signal"))
   implementation(project(":lib:remote-config"))
   implementation(project(":lib:signal-login"))
   implementation(project(":lib:sticky-header-grid"))
