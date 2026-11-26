@@ -257,6 +257,9 @@ android {
     versionCode = (canonicalVersionCode * maxHotfixVersions) + possibleHotfixVersions[currentHotfixVersion]
     versionName = canonicalVersionName
 
+    // Own identity: this fork must not share its package name with Signal.
+    applicationId = "app.messagerie.mesh"
+
     if (isInstrumentationTestRun) {
       applicationIdSuffix = ".test_run"
     }
