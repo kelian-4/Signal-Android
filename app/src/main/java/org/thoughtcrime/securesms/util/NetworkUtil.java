@@ -19,6 +19,7 @@ public final class NetworkUtil {
   private NetworkUtil() {}
 
   public static boolean isConnectedWifi(@NonNull Context context) {
+    if (dev.kelian.mesh.app.MeshOffline.NETWORK_DISABLED) return false;
     ConnectivityManager connectivityManager = ServiceUtil.getConnectivityManager(context);
     Network             activeNetwork       = connectivityManager.getActiveNetwork();
 
@@ -48,16 +49,19 @@ public final class NetworkUtil {
   }
 
   public static boolean isConnectedMobile(@NonNull Context context) {
+    if (dev.kelian.mesh.app.MeshOffline.NETWORK_DISABLED) return false;
     final NetworkInfo info = getNetworkInfo(context);
     return info != null && info.isConnected() && info.getType() == ConnectivityManager.TYPE_MOBILE;
   }
 
   public static boolean isConnectedRoaming(@NonNull Context context) {
+    if (dev.kelian.mesh.app.MeshOffline.NETWORK_DISABLED) return false;
     final NetworkInfo info = getNetworkInfo(context);
     return info != null && info.isConnected() && info.isRoaming() && info.getType() == ConnectivityManager.TYPE_MOBILE;
   }
 
   public static boolean isConnected(@NonNull Context context) {
+    if (dev.kelian.mesh.app.MeshOffline.NETWORK_DISABLED) return false;
     final NetworkInfo info = getNetworkInfo(context);
     return info != null && info.isConnected();
   }

@@ -206,6 +206,7 @@ public class ApplicationContext extends Application implements AppForegroundObse
               .addBlocking("rx-init", this::initializeRx)
               .addBlocking("scrubber", () -> Scrubber.setIdentifierHmacKeyProvider(() -> SignalStore.svr().getMasterKey().deriveLoggingKey()))
               .addBlocking("first-launch", this::initializeFirstEverAppLaunch)
+              .addBlocking("mesh-local-account", () -> dev.kelian.mesh.app.LocalAccount.ensure(this))
               .addBlocking("app-migrations", this::initializeApplicationMigrations)
               .addBlocking("lifecycle-observer", () -> AppForegroundObserver.addListener(this))
               .addBlocking("assistant-screen-security", () -> {

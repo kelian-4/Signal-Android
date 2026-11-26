@@ -964,12 +964,6 @@
             android:exported="false"
             android:theme="@style/Signal.DayNight.NoActionBar" />
 
-        <!-- Mesh entry point: identity, recovery phrase, Bluetooth service. -->
-        <activity
-            android:name="dev.kelian.mesh.app.MeshMainActivity"
-            android:exported="false"
-            android:theme="@android:style/Theme.DeviceDefault.Light" />
-
         <!-- ======================================= -->
         <!-- Activity Aliases                        -->
         <!-- ======================================= -->
@@ -977,7 +971,7 @@
             android:name=".RoutingActivity"
             android:exported="true"
             android:resizeableActivity="true"
-            android:targetActivity="dev.kelian.mesh.app.MeshMainActivity">
+            android:targetActivity=".MainActivity">
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
