@@ -324,8 +324,12 @@ android {
     buildConfigField("boolean", "TRACING_ENABLED", "false")
     buildConfigField("boolean", "LINK_DEVICE_UX_ENABLED", "false")
 
+    // One architecture by default (arm64-v8a covers almost every phone made since 2017): a 4-ABI build is
+    // ~4x bigger. Pass -PmeshAllAbis to build every architecture plus a universal APK.
+    val meshAbis = if (project.hasProperty("meshAllAbis")) listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64") else listOf("arm64-v8a")
+
     ndk {
-      abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+      abiFilters += meshAbis
     }
     resourceConfigurations += listOf()
 
@@ -333,8 +337,8 @@ android {
       abi {
         isEnable = !project.hasProperty("generateBaselineProfile")
         reset()
-        include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
-        isUniversalApk = true
+        include(*meshAbis.toTypedArray())
+        isUniversalApk = project.hasProperty("meshAllAbis")
       }
     }
 
@@ -385,6 +389,10 @@ android {
 
     getByName("release") {
       isMinifyEnabled = true
+      // Sideloaded test builds: signed with the repository's debug key (there is no release keystore here).
+      if (debugKeystorePropertiesProvider.orNull != null) {
+        signingConfig = signingConfigs["debug"]
+      }
       proguardFiles(*buildTypes["debug"].proguardFiles.toTypedArray())
       buildConfigField("String", "BUILD_VARIANT_TYPE", "\"Release\"")
     }
