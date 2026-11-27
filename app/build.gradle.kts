@@ -331,7 +331,8 @@ android {
     ndk {
       abiFilters += meshAbis
     }
-    resourceConfigurations += listOf()
+    // Test builds ship French and English only (the target audience); -PmeshAllLanguages keeps every translation.
+    resourceConfigurations += if (project.hasProperty("meshAllLanguages")) listOf() else listOf("fr", "en")
 
     splits {
       abi {
@@ -390,6 +391,7 @@ android {
 
     getByName("release") {
       isMinifyEnabled = true
+      isShrinkResources = true
       // Sideloaded test builds: signed with the repository's debug key (there is no release keystore here).
       if (debugKeystorePropertiesProvider.orNull != null) {
         signingConfig = signingConfigs["debug"]
