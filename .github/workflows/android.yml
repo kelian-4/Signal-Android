@@ -41,6 +41,10 @@ jobs:
 
   app-debug:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, x86_64]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -48,10 +52,10 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
-      - name: Build the app (single arm64 APK, minified, compressed native libs)
+      - name: Build the app (single ${{ matrix.abi }} APK, minified, compressed native libs)
         run: |
           set -o pipefail
-          ./gradlew :Signal-Android:assembleWebsiteProdRelease --no-daemon --stacktrace 2>&1 | tee gradle-app.log
+          ./gradlew :Signal-Android:assembleWebsiteProdRelease -PmeshAbi=${{ matrix.abi }} --no-daemon --stacktrace 2>&1 | tee gradle-app.log
       - name: Expose Gradle errors as annotations
         if: failure()
         run: |
@@ -65,6 +69,61 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: app-arm64-apk
+          name: app-${{ matrix.abi }}-apk
           path: app/build/outputs/apk/**/*.apk
           compression-level: 0
+
+  # Starts the x86_64 build on an emulator and reports crashes and the visible screen as annotations.
+  # (The emulator has no Bluetooth: this checks startup and the local account only.)
+  smoke-test:
+    needs: app-debug
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: app-x86_64-apk
+          path: apk
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Boot emulator, install, launch, collect logs
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: |
+            adb install -r $(find apk -name "*.apk" | head -1) > install.log 2>&1 || true
+            adb logcat -c
+            adb shell monkey -p app.messagerie.mesh -c android.intent.category.LAUNCHER 1 > launch.log 2>&1 || true
+            sleep 45
+            adb logcat -d > logcat.txt
+            adb shell pidof app.messagerie.mesh > pid.txt || true
+            adb shell dumpsys activity activities | grep -E "topResumedActivity|mResumedActivity" > resumed.txt || true
+            adb exec-out screencap -p > screen.png || true
+      - name: Report as annotations
+        if: always()
+        run: |
+          {
+            echo "install: $(tr '\n' ' ' < install.log | cut -c1-300)"
+            echo "launch: $(tr '\n' ' ' < launch.log | cut -c1-200)"
+            echo "process alive: $(cat pid.txt)"
+            echo "resumed: $(cat resumed.txt)"
+            echo "--- crashes ---"
+            grep -nE "FATAL EXCEPTION|AndroidRuntime|Process: app.messagerie.mesh|has died|ANR in" -A8 logcat.txt | head -50
+            echo "--- mesh/app errors ---"
+            grep -nE "MeshLocalAccount|mesh-|LocalAccount|SignalStore|Exception" logcat.txt | head -25
+          } > smoke.txt || true
+          msg=$(sed 's/%/%25/g' smoke.txt | awk '{printf "%s%%0A", $0}' | cut -c1-6000)
+          echo "::notice title=smoke::$msg"
+      - name: Upload smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-logcat-and-screenshot
+          path: |
+            logcat.txt
+            screen.png

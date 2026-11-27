@@ -325,8 +325,12 @@ android {
     buildConfigField("boolean", "LINK_DEVICE_UX_ENABLED", "false")
 
     // One architecture by default (arm64-v8a covers almost every phone made since 2017): a 4-ABI build is
-    // ~4x bigger. Pass -PmeshAllAbis to build every architecture plus a universal APK.
-    val meshAbis = if (project.hasProperty("meshAllAbis")) listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64") else listOf("arm64-v8a")
+    // ~4x bigger. Pass -PmeshAbi=x86_64 for Waydroid/emulators, or -PmeshAllAbis for every architecture plus a universal APK.
+    val meshAbis = when {
+      project.hasProperty("meshAllAbis") -> listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+      project.hasProperty("meshAbi") -> listOf(project.property("meshAbi").toString())
+      else -> listOf("arm64-v8a")
+    }
 
     ndk {
       abiFilters += meshAbis
