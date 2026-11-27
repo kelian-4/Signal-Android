@@ -335,10 +335,11 @@ android {
 
     splits {
       abi {
-        isEnable = !project.hasProperty("generateBaselineProfile")
+        // A single architecture is selected by the ndk abiFilters above (one APK); splits are only for -PmeshAllAbis.
+        isEnable = project.hasProperty("meshAllAbis") && !project.hasProperty("generateBaselineProfile")
         reset()
         include(*meshAbis.toTypedArray())
-        isUniversalApk = project.hasProperty("meshAllAbis")
+        isUniversalApk = true
       }
     }
 
