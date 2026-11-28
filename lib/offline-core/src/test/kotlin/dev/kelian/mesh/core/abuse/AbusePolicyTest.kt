@@ -30,7 +30,7 @@ class AbusePolicyTest {
         val p = AbusePolicy(dailyUnknownLimit = 3)
         for (i in 0 until 3) { assertEquals(Verdict.ALLOW, p.checkOutgoing("u$i", ContactStanding.UNKNOWN, txt, 10)); p.recordSent("u$i", ContactStanding.UNKNOWN, 10) }
         assertEquals(Verdict.REJECT_DAILY_LIMIT, p.checkOutgoing("u9", ContactStanding.UNKNOWN, txt, 20))
-        assertEquals(Verdict.ALLOW, p.checkOutgoing("known", ContactStanding.VERIFIED, txt, 20)) // contacts are not limited
+        assertEquals(Verdict.ALLOW, p.checkOutgoing("known", ContactStanding.VERIFIED, txt, 20))
         assertEquals(Verdict.ALLOW, p.checkOutgoing("u9", ContactStanding.UNKNOWN, txt, 10 + day))
     }
 

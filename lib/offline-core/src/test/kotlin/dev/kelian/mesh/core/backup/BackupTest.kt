@@ -13,7 +13,7 @@ class BackupTest {
         listOf(BackupContact("c1", "Aïcha", ByteArray(32) { 7 }, true), BackupContact("c2", "Paul", ByteArray(32) { 8 }, false)),
         listOf(BackupMessage("0102030405060708", "c1", true, 1000, "Bonjour é 😀"), BackupMessage("0807060504030201", "c1", false, 2000, "")),
     )
-    private val fast = 1000 // low PBKDF2 cost keeps the unit test quick; the format is identical
+    private val fast = 1000
 
     @Test fun roundTrip() {
         val enc = BackupCodec.encrypt(phrase, bundle, iterations = fast)
@@ -33,7 +33,7 @@ class BackupTest {
         fun rejected(f: () -> Unit) = try { f(); false } catch (e: BackupException) { true }
         assertTrue(rejected { BackupCodec.decrypt(other, enc, iterations = fast) })
         assertTrue(rejected { BackupCodec.decrypt(phrase, enc.copyOf().also { it[enc.size - 1] = (it[enc.size - 1] + 1).toByte() }, iterations = fast) })
-        assertTrue(rejected { BackupCodec.decrypt(phrase, enc.copyOf().also { it[10] = (it[10] + 1).toByte() }, iterations = fast) }) // header is authenticated
+        assertTrue(rejected { BackupCodec.decrypt(phrase, enc.copyOf().also { it[10] = (it[10] + 1).toByte() }, iterations = fast) })
         assertTrue(rejected { BackupCodec.decrypt(phrase, ByteArray(100), iterations = fast) })
         assertTrue(rejected { BackupCodec.decrypt(phrase, ByteArray(3), iterations = fast) })
     }

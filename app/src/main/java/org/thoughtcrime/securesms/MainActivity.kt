@@ -294,6 +294,7 @@ class MainActivity :
     AppStartup.getInstance().onCriticalRenderEventStart()
 
     super.onCreate(savedInstanceState, ready)
+    dev.kelian.mesh.app.MeshStartup.begin(this)
     navigator = MainNavigator(this, mainNavigationViewModel)
 
     AppForegroundObserver.addListener(object : AppForegroundObserver.Listener {

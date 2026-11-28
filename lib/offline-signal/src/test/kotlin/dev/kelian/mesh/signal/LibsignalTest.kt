@@ -52,7 +52,7 @@ class LibsignalTest {
         val a = LibsignalIdentity.generate(); val b = LibsignalIdentity.generate()
         val qr = QrPayload.parse(QrPayload.create(a, "Awa", 5000).encode(), 5100, LibsignalSignatures)!!
         assertEquals(33, qr.publicKey.size)
-        assertNull(QrPayload.parse(QrPayload.create(a, "Awa", 5000).encode(), 5100)) // the Ed25519 default refuses it
+        assertNull(QrPayload.parse(QrPayload.create(a, "Awa", 5000).encode(), 5100))
         val ch = Challenge.newChallenge()
         assertTrue(Challenge.verify(a.publicKey, ch, b.publicKey, Challenge.respond(a, ch, b.publicKey), LibsignalSignatures))
         assertFalse(Challenge.verify(b.publicKey, ch, b.publicKey, Challenge.respond(a, ch, b.publicKey), LibsignalSignatures))
@@ -62,7 +62,7 @@ class LibsignalTest {
         val c = LibsignalSessionCipher(LibsignalIdentity.generate())
         val text = c.publishBundle().encode()
         assertNotNull(PreKeyBundle.parse(text, LibsignalSignatures))
-        assertTrue("bundle is ${text.length} chars", text.length <= 2900) // QR version 40 holds ~2950 bytes
+        assertTrue("bundle is ${text.length} chars", text.length <= 2900)
         val raw = java.util.Base64.getUrlDecoder().decode(text); raw[raw.size / 2] = (raw[raw.size / 2] + 1).toByte()
         assertNull(PreKeyBundle.parse(java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(raw), LibsignalSignatures))
     }
@@ -76,14 +76,14 @@ class LibsignalTest {
         val first = a.encrypt(ib.publicKey, "bonjour".toByteArray())
         assertFalse(String(first, Charsets.ISO_8859_1).contains("bonjour"))
         assertEquals("bonjour", String(b.decrypt(ia.publicKey, first)!!))
-        assertTrue(b.canEncrypt(ia.publicKey)) // the session exists on Bob's side after the first message
+        assertTrue(b.canEncrypt(ia.publicKey))
         val reply = b.encrypt(ia.publicKey, "salut".toByteArray())
         assertEquals("salut", String(a.decrypt(ib.publicKey, reply)!!))
         val second = a.encrypt(ib.publicKey, "suite".toByteArray())
         assertEquals("suite", String(b.decrypt(ia.publicKey, second)!!))
         val tampered = second.copyOf().also { it[it.size - 1] = (it[it.size - 1] + 1).toByte() }
         assertNull(b.decrypt(ia.publicKey, tampered))
-        assertNull(b.decrypt(LibsignalIdentity.generate().publicKey, second)) // wrong peer
+        assertNull(b.decrypt(LibsignalIdentity.generate().publicKey, second))
     }
 
     @Test fun sessionsSurviveARestart() {
@@ -93,7 +93,7 @@ class LibsignalTest {
         exchangeBundles(a, b, oneWay = true)
         assertEquals("1", String(b.decrypt(ia.publicKey, a.encrypt(ib.publicKey, "1".toByteArray()))!!))
         val reply = b.encrypt(ia.publicKey, "2".toByteArray())
-        val a2 = LibsignalSessionCipher(ia, f) // app restarted
+        val a2 = LibsignalSessionCipher(ia, f)
         assertTrue(a2.canEncrypt(ib.publicKey))
         assertEquals("2", String(a2.decrypt(ib.publicKey, reply)!!))
         assertEquals("3", String(b.decrypt(ia.publicKey, a2.encrypt(ib.publicKey, "3".toByteArray()))!!))
@@ -115,7 +115,6 @@ class LibsignalTest {
         val a = MeshEngine(ia, "Alice", ca, radio.sink("A"), { radio.now })
         val b = MeshEngine(ib, "Bob", cb, radio.sink("B"), { radio.now })
         val c = MeshEngine(ic, "Relais", cc, radio.sink("C"), { radio.now })
-        // in-person meeting: QR (signature check), challenge-response, bundle exchange
         val qrB = QrPayload.parse(QrPayload.create(ib, "Bob", radio.now).encode(), radio.now, LibsignalSignatures)!!
         val qrA = QrPayload.parse(QrPayload.create(ia, "Alice", radio.now).encode(), radio.now, LibsignalSignatures)!!
         a.addContact("bob", qrB); b.addContact("alice", qrA)
@@ -123,9 +122,8 @@ class LibsignalTest {
         assertTrue(Challenge.verify(qrB.publicKey, ch, ia.publicKey, Challenge.respond(ib, ch, ia.publicKey), LibsignalSignatures))
         assertTrue(a.markVerified("bob")); assertTrue(b.markVerified("alice"))
         assertEquals(TrustLevel.VERIFIED, a.trust.level("bob"))
-        assertTrue(a.sendText("bob", "trop tôt") is SendResult.NoSession) // no bundle yet
+        assertTrue(a.sendText("bob", "trop tôt") is SendResult.NoSession)
         exchangeBundles(ca, cb)
-        // later: A and B are out of range of each other, C sits between them
         radio.connect(a, "A", "toC", c, "C", "toA"); radio.connect(c, "C", "toB", b, "B", "toC")
         assertTrue(a.sendText("bob", "salut Bob, via le relais") is SendResult.Queued)
         radio.run()
@@ -133,9 +131,17 @@ class LibsignalTest {
         assertTrue(c.events.isEmpty())
         assertEquals(0, a.pendingCount())
         assertTrue(a.events.any { it is MeshEvent.Delivered })
-        // and the other way round, on the same ratchet
         assertTrue(b.sendText("alice", "bien reçu") is SendResult.Queued)
         radio.run()
         assertEquals("bien reçu", a.events.filterIsInstance<MeshEvent.Text>().single().text)
+    }
+
+    @Test fun bundleTextBuildsASessionAndRejectsGarbage() {
+        val ia = LibsignalIdentity.generate(); val ib = LibsignalIdentity.generate()
+        val a = LibsignalSessionCipher(ia); val b = LibsignalSessionCipher(ib)
+        assertFalse(a.canEncrypt(ib.publicKey))
+        assertTrue(a.acceptBundleText(b.bundleText()!!))
+        assertTrue(a.canEncrypt(ib.publicKey))
+        assertFalse(a.acceptBundleText("garbage"))
     }
 }

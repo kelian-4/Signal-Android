@@ -2,10 +2,6 @@ package dev.kelian.mesh.ble
 
 import android.os.Handler
 
-/**
- * Serializes GATT operations: Android allows only one outstanding operation per connection.
- * Must be used from the engine handler thread only.
- */
 class OpQueue(
     private val handler: Handler,
     private val log: (String) -> Unit,
@@ -23,13 +19,11 @@ class OpQueue(
         onTimeout()
     }
 
-    /** [timeoutMs] overrides the default timeout for this operation only (e.g. a slow MTU exchange). */
     fun enqueue(name: String, onDone: ((Boolean) -> Unit)? = null, timeoutMs: Long? = null, run: () -> Boolean) {
         queue.addLast(Op(name, timeoutMs, run, onDone))
         pump()
     }
 
-    /** Call when the callback of the current operation arrived. */
     fun done(success: Boolean = true) {
         handler.removeCallbacks(timeoutRunnable)
         val op = current

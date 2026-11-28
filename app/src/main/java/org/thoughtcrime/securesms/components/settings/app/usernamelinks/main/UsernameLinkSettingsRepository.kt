@@ -49,10 +49,10 @@ import org.signal.core.ui.R as CoreUiR
  */
 object UsernameLinkSettingsRepository {
 
-  fun getUsername(): String = SignalStore.account.username.orEmpty()
+  fun getUsername(): String = dev.kelian.mesh.app.MeshQr.displayName(AppDependencies.application)
 
   /** The user's username link, or null if they don't have one yet. */
-  fun getUsernameLink(): String? = SignalStore.account.usernameLink?.toLink()
+  fun getUsernameLink(): String? = dev.kelian.mesh.app.MeshQr.myLink(AppDependencies.application)
 
   fun getColorScheme(): UsernameQrCodeColorScheme = SignalStore.misc.usernameQrCodeColorScheme
 
@@ -65,7 +65,7 @@ object UsernameLinkSettingsRepository {
   fun toLink(components: UsernameLinkComponents): String = components.toLink()
 
   /** Replaces the user's username link with a new one, or makes their first. */
-  suspend fun resetUsernameLink(): UsernameLinkResetResult = UsernameRepository.createOrResetUsernameLink().await()
+  suspend fun resetUsernameLink(): UsernameLinkResetResult = UsernameLinkResetResult.NetworkError
 
   /** Looks up whoever [url], read from a QR code, belongs to. */
   suspend fun lookUpUsernameLink(url: String): QrScanResult = UsernameQrScanRepository.lookupUsernameUrl(url).await()

@@ -9,11 +9,6 @@ import org.signal.libsignal.protocol.ecc.ECPrivateKey
 import org.signal.libsignal.protocol.ecc.ECPublicKey
 import java.security.SecureRandom
 
-/**
- * Device identity on libsignal's Curve25519 key (33-byte public key, XEd25519 signatures), the same
- * key type Signal sessions use. The 32-byte [seed] is what the 24-word phrase encodes; the key is
- * derived from it deterministically, so a restored phrase gives back the same public key.
- */
 class LibsignalIdentity private constructor(val seed: ByteArray, internal val privateKey: ECPrivateKey) : IdentitySigner {
     override val publicKey: ByteArray = privateKey.getPublicKey().serialize()
     val identityKeyPair: IdentityKeyPair = IdentityKeyPair(IdentityKey(privateKey.getPublicKey()), privateKey)
@@ -32,7 +27,6 @@ class LibsignalIdentity private constructor(val seed: ByteArray, internal val pr
     }
 }
 
-/** Signature check for QR codes, challenges and prekey bundles when identities are libsignal keys. */
 object LibsignalSignatures : SignatureVerifier {
     override fun verify(publicKey: ByteArray, message: ByteArray, signature: ByteArray): Boolean = try {
         ECPublicKey(publicKey).verifySignature(message, signature)

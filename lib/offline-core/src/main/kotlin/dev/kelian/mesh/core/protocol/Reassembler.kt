@@ -1,16 +1,13 @@
 package dev.kelian.mesh.core.protocol
 
-/** Result of feeding one raw frame to the [Reassembler]. */
 sealed class RxResult {
     object Partial : RxResult()
     object Invalid : RxResult()
     class Complete(val msgId: ByteArray, val payload: ByteArray) : RxResult()
-    /** Already delivered earlier: the receiver must still re-send an ACK. */
     class Duplicate(val msgId: ByteArray) : RxResult()
     class Ack(val msgId: ByteArray) : RxResult()
 }
 
-/** Reassembly and de-duplication by msgId. Not thread-safe: call from one thread. */
 class Reassembler {
     private class Entry(val firstSeenMs: Long, val total: Int) {
         val frags = HashMap<Int, ByteArray>()

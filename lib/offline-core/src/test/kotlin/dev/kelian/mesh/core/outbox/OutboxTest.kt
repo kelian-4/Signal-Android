@@ -16,7 +16,7 @@ class OutboxTest {
         assertTrue(a.enqueue(id(1), tag, "hello".toByteArray(), 100))
         assertTrue(a.enqueue(id(2), tag, ByteArray(0), 200))
         a.markAttempt("0101010101010101")
-        val b = Outbox(FileOutboxStore(f)) // simulated app restart
+        val b = Outbox(FileOutboxStore(f))
         assertEquals(2, b.pending().size)
         assertEquals(1, b.pending()[0].attempts)
         assertEquals("hello", String(b.pending()[0].payload))

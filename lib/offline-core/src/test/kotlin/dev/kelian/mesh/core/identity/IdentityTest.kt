@@ -48,7 +48,7 @@ class IdentityTest {
         assertEquals(a.publicKey.toHex(), restored.publicKey.toHex())
         assertEquals(32, a.publicKey.size)
         val msg = "salut".toByteArray()
-        assertTrue(Ed25519.verify(a.publicKey, msg, restored.sign(msg))) // signature made after restore verifies against the original key
+        assertTrue(Ed25519.verify(a.publicKey, msg, restored.sign(msg)))
         assertTrue(Identity.generate().publicKey.toHex() != a.publicKey.toHex())
     }
 

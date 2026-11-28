@@ -14,15 +14,10 @@ import javax.crypto.spec.SecretKeySpec
 class BackupContact(val id: String, val nickname: String, val publicKey: ByteArray, val verified: Boolean)
 class BackupMessage(val msgIdHex: String, val contactId: String, val outgoing: Boolean, val timestampMs: Long, val text: String)
 
-/**
- * What a backup holds: contacts and history. It deliberately has NO field for session state:
- * after a restore, sessions are renegotiated.
- */
 class BackupBundle(val contacts: List<BackupContact>, val messages: List<BackupMessage>)
 
 class BackupException(message: String) : Exception(message)
 
-/** File format: "MSHB" | version(1) | salt(16) | iv(12) | AES-256-GCM(ciphertext+tag); the header is the AAD. */
 object BackupCodec {
     private val MAGIC = byteArrayOf('M'.code.toByte(), 'S'.code.toByte(), 'H'.code.toByte(), 'B'.code.toByte())
     private const val VERSION = 1

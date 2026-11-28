@@ -1,6 +1,4 @@
-/*
- * SPDX-License-Identifier: AGPL-3.0-only
- */
+
 
 plugins {
   id("java-library")

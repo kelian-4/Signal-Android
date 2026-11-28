@@ -6,7 +6,6 @@ import java.io.File
 
 class OutboxEntry(val msgIdHex: String, val destTagHex: String, val payload: ByteArray, val createdMs: Long, val attempts: Int)
 
-/** Persistence boundary: Android supplies a database-backed store, tests use files or memory. */
 interface OutboxStore {
     fun load(): List<OutboxEntry>
     fun save(entries: List<OutboxEntry>)
@@ -18,7 +17,6 @@ class InMemoryOutboxStore : OutboxStore {
     override fun save(entries: List<OutboxEntry>) { data = entries.toList() }
 }
 
-/** One line per entry: msgId destTag created attempts payload(hex). Written atomically. */
 class FileOutboxStore(private val file: File) : OutboxStore {
     override fun load(): List<OutboxEntry> {
         if (!file.exists()) return emptyList()
@@ -36,7 +34,6 @@ class FileOutboxStore(private val file: File) : OutboxStore {
     }
 }
 
-/** Messages are kept and re-sent on every (re)connection until their ACK arrives. */
 class Outbox(private val store: OutboxStore, private val maxEntries: Int = 1000) {
     private val entries = ArrayList(store.load())
 
@@ -59,7 +56,6 @@ class Outbox(private val store: OutboxStore, private val maxEntries: Int = 1000)
         store.save(entries)
     }
 
-    /** Returns true if the ACK matched a pending message. */
     fun ack(msgId: ByteArray): Boolean {
         val removed = entries.removeAll { it.msgIdHex == msgId.toHex() }
         if (removed) store.save(entries)

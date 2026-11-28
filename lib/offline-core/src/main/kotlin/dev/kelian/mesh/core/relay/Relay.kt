@@ -7,11 +7,6 @@ const val RELAY_VERSION = 1
 const val RELAY_HEADER = 18
 const val MAX_TTL = 7
 
-/**
- * Opaque envelope relayed between devices. [payload] is ciphertext: a relaying device never
- * needs (and is never able) to read it. [destTag] is an ephemeral per-contact routing tag,
- * never a stable identifier.
- */
 class Packet(val msgId: ByteArray, val destTag: ByteArray, val ttl: Int, val payload: ByteArray) {
     fun encode(): ByteArray {
         require(msgId.size == 8 && destTag.size == 8 && ttl in 0..MAX_TTL)
@@ -36,10 +31,6 @@ sealed class RelayDecision {
     class Drop(val reason: String) : RelayDecision()
 }
 
-/**
- * Simple relay rules: de-duplicate by msgId (bounded LRU cache with time limit), deliver packets
- * addressed to us, otherwise forward with TTL-1 until TTL runs out. Not thread-safe.
- */
 class RelayEngine(
     private val ownTags: () -> Set<String>,
     private val cacheCapacity: Int = 512,
@@ -53,7 +44,6 @@ class RelayEngine(
 
     val cacheSize get() = seen.size
 
-    /** Registers a packet we originate so that it is never re-forwarded back to us. */
     fun markOriginated(p: Packet, nowMs: Long) { seen[p.msgId.toHex()] = nowMs }
 
     fun markOriginatedIfNew(p: Packet, nowMs: Long) { if (!seen.containsKey(p.msgId.toHex())) markOriginated(p, nowMs) }
@@ -70,7 +60,6 @@ class RelayEngine(
     }
 }
 
-/** In-memory network of nodes used by tests: no radio, deterministic, synchronous. */
 class SimNetwork {
     inner class Node(val name: String, val tag: ByteArray, cacheCapacity: Int = 512) {
         val engine = RelayEngine({ setOf(tag.toHex()) }, cacheCapacity)
@@ -93,7 +82,6 @@ class SimNetwork {
     fun link(a: Node, b: Node) { a.neighbors.add(b); b.neighbors.add(a) }
     fun unlink(a: Node, b: Node) { a.neighbors.remove(b); b.neighbors.remove(a) }
 
-    /** Delivers queued transmissions until the network is quiet; returns the number processed. */
     fun run(maxSteps: Int = 100_000): Int {
         var steps = 0
         while (queue.isNotEmpty()) {

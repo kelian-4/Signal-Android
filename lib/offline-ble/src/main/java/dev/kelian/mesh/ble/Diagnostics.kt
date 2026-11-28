@@ -11,11 +11,6 @@ import android.os.SystemClock
 import dev.kelian.mesh.core.link.LinkDiagnostics
 import java.io.File
 
-/**
- * Records one CSV line per link event with the phone state around it (thermal, main-thread stall,
- * disconnect code, RSSI, battery, screen lock), to explain stalls like the 46 s freeze seen in the field.
- * The file stays on the phone; nothing is sent anywhere.
- */
 class DiagnosticsRecorder(private val ctx: Context, file: File?) {
     private val out = file
     private val ring = ArrayDeque<String>()

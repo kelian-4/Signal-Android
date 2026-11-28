@@ -17,7 +17,7 @@ class AckWatchdogTest {
         assertTrue(w.poll(5_000) is WatchdogAction.None)
         val a = w.poll(46_000)
         assertTrue(a is WatchdogAction.Reconnect && a.stale == 27 && a.attempt == 1)
-        assertTrue(w.poll(46_100) is WatchdogAction.None) // timers restarted on the new link
+        assertTrue(w.poll(46_100) is WatchdogAction.None)
         assertEquals(27, w.inFlight())
     }
 

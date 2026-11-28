@@ -11,7 +11,6 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
 
-/** Content of a contact QR code: identity key, nickname, timestamp, signature by that key. */
 class QrPayload(val publicKey: ByteArray, val nickname: String, val timestampMs: Long, val signature: ByteArray) {
     fun encode(): String {
         val bo = ByteArrayOutputStream(); val o = DataOutputStream(bo)
@@ -20,7 +19,7 @@ class QrPayload(val publicKey: ByteArray, val nickname: String, val timestampMs:
     }
 
     companion object {
-        const val MAX_AGE_MS = 10L * 60 * 1000
+        const val MAX_AGE_MS = 24L * 60 * 60 * 1000
         private fun signedBytes(pk: ByteArray, nick: String, ts: Long): ByteArray {
             val bo = ByteArrayOutputStream(); val o = DataOutputStream(bo)
             o.write("mesh-qr-v1".toByteArray()); o.write(pk); o.writeUTF(nick); o.writeLong(ts)
@@ -30,7 +29,6 @@ class QrPayload(val publicKey: ByteArray, val nickname: String, val timestampMs:
         fun create(signer: IdentitySigner, nickname: String, nowMs: Long) =
             QrPayload(signer.publicKey, nickname, nowMs, signer.sign(signedBytes(signer.publicKey, nickname, nowMs)))
 
-        /** Returns null if malformed, badly signed, too old or from the future. */
         fun parse(text: String, nowMs: Long, verifier: SignatureVerifier = Ed25519): QrPayload? = runCatching {
             val i = DataInputStream(ByteArrayInputStream(Base64.getUrlDecoder().decode(text)))
             if (i.readUnsignedByte() != 2) return null
@@ -47,7 +45,6 @@ class QrPayload(val publicKey: ByteArray, val nickname: String, val timestampMs:
     }
 }
 
-/** Challenge-response run right after the scan: proves the scanned phone holds the private key now. */
 object Challenge {
     fun newChallenge(random: SecureRandom = SecureRandom()) = ByteArray(16).also { random.nextBytes(it) }
 
@@ -61,7 +58,6 @@ object Challenge {
         verifier.verify(scannedPk, bytes(challenge, scannerPk, scannedPk), response)
 }
 
-/** 60-digit safety number, identical on both phones, changes if either key changes. */
 object SecurityCode {
     fun compute(pkA: ByteArray, pkB: ByteArray): String {
         val (x, y) = listOf(pkA, pkB).sortedWith { a, b -> java.util.Arrays.compareUnsigned(a, b) }
@@ -79,7 +75,6 @@ enum class TrustLevel { UNVERIFIED, VERIFIED }
 
 class KeyChangeAlert(val contactId: String, val previousKey: ByteArray, val newKey: ByteArray, val wasVerified: Boolean)
 
-/** Trust state per contact. Everyone is UNVERIFIED until an in-person QR scan succeeds. */
 class ContactTrustBook {
     private class Entry(var key: ByteArray, var level: TrustLevel)
     private val entries = HashMap<String, Entry>()
@@ -92,7 +87,6 @@ class ContactTrustBook {
         e.level = TrustLevel.VERIFIED; return true
     }
 
-    /** Call with the identity key authenticated in each session; a different key drops the badge and alerts. */
     fun onKeySeen(contactId: String, key: ByteArray): KeyChangeAlert? {
         val e = entries[contactId] ?: return null
         if (e.key.contentEquals(key)) return null

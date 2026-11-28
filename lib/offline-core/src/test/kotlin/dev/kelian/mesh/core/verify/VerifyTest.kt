@@ -19,13 +19,11 @@ class VerifyTest {
 
     @Test fun qrRejectsTamperingExpiryAndGarbage() {
         val qr = QrPayload.create(alice, "Alice", 1_000_000).encode()
-        assertNull(QrPayload.parse(qr, 1_000_000 + QrPayload.MAX_AGE_MS + 1)) // expired
-        assertNull(QrPayload.parse(qr, 1_000_000 - 120_000)) // from the future
+        assertNull(QrPayload.parse(qr, 1_000_000 + QrPayload.MAX_AGE_MS + 1))
+        assertNull(QrPayload.parse(qr, 1_000_000 - 120_000))
         assertNull(QrPayload.parse("not base64 !!", 0)); assertNull(QrPayload.parse("", 0)); assertNull(QrPayload.parse("AAAA", 0))
-        // swap in another nickname: the signature no longer matches
         val forged = QrPayload(alice.publicKey, "Mallory", 1_000_000, QrPayload.create(alice, "Alice", 1_000_000).signature).encode()
         assertNull(QrPayload.parse(forged, 1_000_100))
-        // someone else's key with Alice's signature
         val stolen = QrPayload(bob.publicKey, "Alice", 1_000_000, QrPayload.create(alice, "Alice", 1_000_000).signature).encode()
         assertNull(QrPayload.parse(stolen, 1_000_100))
     }
@@ -34,9 +32,9 @@ class VerifyTest {
         val ch = Challenge.newChallenge()
         val resp = Challenge.respond(alice, ch, bob.publicKey)
         assertTrue(Challenge.verify(alice.publicKey, ch, bob.publicKey, resp))
-        assertFalse(Challenge.verify(alice.publicKey, Challenge.newChallenge(), bob.publicKey, resp)) // replay with another challenge
-        assertFalse(Challenge.verify(bob.publicKey, ch, bob.publicKey, resp)) // an impostor showing Alice's QR cannot answer
-        val mallory = Identity.generate() // copied Alice's QR but has another key
+        assertFalse(Challenge.verify(alice.publicKey, Challenge.newChallenge(), bob.publicKey, resp))
+        assertFalse(Challenge.verify(bob.publicKey, ch, bob.publicKey, resp))
+        val mallory = Identity.generate()
         assertFalse(Challenge.verify(alice.publicKey, ch, bob.publicKey, Challenge.respond(mallory, ch, bob.publicKey)))
     }
 
@@ -51,7 +49,7 @@ class VerifyTest {
         val book = ContactTrustBook()
         book.add("bob", bob.publicKey)
         assertEquals(TrustLevel.UNVERIFIED, book.level("bob"))
-        assertFalse(book.markVerified("bob", alice.publicKey)) // wrong key cannot verify
+        assertFalse(book.markVerified("bob", alice.publicKey))
         assertTrue(book.markVerified("bob", bob.publicKey))
         assertEquals(TrustLevel.VERIFIED, book.level("bob"))
         assertNull(book.onKeySeen("bob", bob.publicKey))
@@ -59,7 +57,7 @@ class VerifyTest {
         val alert = book.onKeySeen("bob", newKey)
         assertNotNull(alert); assertTrue(alert!!.wasVerified)
         assertEquals(TrustLevel.UNVERIFIED, book.level("bob"))
-        assertNull(book.onKeySeen("bob", newKey)) // alert raised once
+        assertNull(book.onKeySeen("bob", newKey))
         assertNull(book.onKeySeen("unknown", newKey))
     }
 
@@ -68,7 +66,6 @@ class VerifyTest {
         assertFalse(book.onKeySeen("bob", alice.publicKey)!!.wasVerified)
     }
 
-    /** Stand-in for libsignal's Curve25519/XEd25519: 33-byte keys, 64-byte signatures, NOT secure. */
     private class CurveLikeSigner(seed: Int) : dev.kelian.mesh.core.identity.IdentitySigner {
         override val publicKey = ByteArray(33) { (if (it == 0) 5 else seed + it).toByte() }
         override fun sign(message: ByteArray) = CurveLikeScheme.sig(publicKey, message)
@@ -81,7 +78,7 @@ class VerifyTest {
     @Test fun otherSignatureSchemesAndKeyLengthsPlugIn() {
         val a = CurveLikeSigner(1); val b = CurveLikeSigner(50)
         val qr = QrPayload.create(a, "Awa", 5_000).encode()
-        assertNull(QrPayload.parse(qr, 5_100)) // default Ed25519 rejects a foreign scheme
+        assertNull(QrPayload.parse(qr, 5_100))
         val p = QrPayload.parse(qr, 5_100, CurveLikeScheme)!!
         assertEquals(33, p.publicKey.size); assertEquals("Awa", p.nickname)
         val ch = Challenge.newChallenge()
@@ -90,6 +87,6 @@ class VerifyTest {
         val bundle = dev.kelian.mesh.core.prekeys.PreKeyBundle.create(a, 3, ByteArray(33) { 1 }, listOf(7 to ByteArray(33) { 2 }), ByteArray(1600) { 9 })
         val back = dev.kelian.mesh.core.prekeys.PreKeyBundle.parse(bundle.encode(), CurveLikeScheme)!!
         assertEquals(1600, back.extra.size); assertEquals(33, back.identityKey.size)
-        assertNull(dev.kelian.mesh.core.prekeys.PreKeyBundle.parse(bundle.encode())) // default scheme rejects it
+        assertNull(dev.kelian.mesh.core.prekeys.PreKeyBundle.parse(bundle.encode()))
     }
 }

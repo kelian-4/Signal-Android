@@ -1,6 +1,5 @@
 package dev.kelian.mesh.core.protocol
 
-/** Runs every case of spec/vectors.json; returns a list of failure descriptions (empty = all good). */
 object VectorRunner {
     @Suppress("UNCHECKED_CAST")
     private fun Any?.m() = this as Map<String, Any?>
@@ -65,7 +64,6 @@ object VectorRunner {
                     is RxResult.Ack -> res.msgId.toHex()
                     else -> null
                 }
-                // Partial results carry no msgId in the app API, so only compare when one is returned.
                 if (gotId != null) check(gotId == st["msg_id_hex"]) { "$name: msgId $gotId != ${st["msg_id_hex"]}" }
                 if (res is RxResult.Complete) check(res.payload.toHex() == st["payload_hex"]) { "$name: payload differs" }
             }

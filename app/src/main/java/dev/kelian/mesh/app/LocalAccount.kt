@@ -11,18 +11,15 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.UUID
 
-/**
- * Registers the account locally, with no screen and no server: the account id (ACI) is derived from the
- * device identity key, the account has no phone number (Signal supports such accounts) and nothing
- * is sent anywhere. It mirrors what Signal's registration writes locally, so its conversation list,
- * database and notifications work unchanged. Idempotent.
- */
 object LocalAccount {
     @JvmStatic
     fun ensure(context: Context) {
         val account = SignalStore.account
         val registration = SignalStore.registration
-        if (account.isRegistered && registration.isRegistrationComplete && account.aci != null) return
+        if (account.isRegistered && registration.isRegistrationComplete && account.aci != null) {
+            ensureUsername(context)
+            return
+        }
 
         val identity = MeshApp.identityOrCreate(context)
         val aci = ACI.from(aciFor(identity.publicKey))
@@ -49,9 +46,15 @@ object LocalAccount {
         registration.hasPromptedPushRegistration = true
         account.isUnauthorizedReceived = false
         registration.markRegistrationComplete()
+        ensureUsername(context)
     }
 
-    /** Stable account id for an identity key: a v4-shaped UUID taken from a hash of the key. */
+    private fun ensureUsername(context: Context) {
+        if (SignalStore.account.username == null) {
+            SignalStore.account.username = MeshApp.defaultNickname(MeshApp.identityOrCreate(context)) + ".01"
+        }
+    }
+
     internal fun aciFor(identityPublicKey: ByteArray): UUID {
         val h = MessageDigest.getInstance("SHA-256").digest("mesh-aci-v1".toByteArray() + identityPublicKey)
         h[6] = ((h[6].toInt() and 0x0F) or 0x40).toByte()

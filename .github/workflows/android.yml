@@ -1,7 +1,5 @@
 name: android
 
-# Signal's original workflows were removed (see NOTICE.md). This one runs the unit-test battery of the
-# offline core (frames, fragmentation, relay, outbox, identity, backup, QR verification, anti-abuse).
 on:
   push:
     branches: [dev]
@@ -73,8 +71,6 @@ jobs:
           path: app/build/outputs/apk/**/*.apk
           compression-level: 0
 
-  # Starts the x86_64 build on an emulator and reports crashes and the visible screen as annotations.
-  # (The emulator has no Bluetooth: this checks startup and the local account only.)
   smoke-test:
     needs: app-debug
     runs-on: ubuntu-latest

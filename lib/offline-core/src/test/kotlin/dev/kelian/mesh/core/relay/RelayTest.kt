@@ -27,7 +27,7 @@ class RelayTest {
         net.run()
         assertEquals(1, c.inbox.size); assertEquals("cipher", String(c.inbox[0].payload))
         assertEquals(0, b.inbox.size); assertEquals(0, a.inbox.size)
-        assertEquals(2, c.inbox[0].ttl) // 3 at A, 2 after B forwarded
+        assertEquals(2, c.inbox[0].ttl)
     }
 
     @Test fun ttlLimitsTheNumberOfHops() {
@@ -35,7 +35,7 @@ class RelayTest {
         val n = (0..5).map { net.node("N$it", "0".repeat(15) + it) }
         for (i in 0 until 5) net.link(n[i], n[i + 1])
         n[0].send(pkt("2222222222222222", "0".repeat(15) + "5", 3), 0); net.run()
-        assertEquals(0, n[5].inbox.size) // needs 5 hops
+        assertEquals(0, n[5].inbox.size)
         n[0].send(pkt("3333333333333333", "0".repeat(15) + "5", 6), 0); net.run()
         assertEquals(1, n[5].inbox.size)
     }
@@ -47,7 +47,7 @@ class RelayTest {
         n[0].send(pkt("4444444444444444", "0".repeat(15) + "3", 7), 0)
         net.run()
         assertEquals(1, n[3].inbox.size)
-        assertTrue(n.sumOf { it.transmissions } <= 6 * 5) // each node forwards at most once to its 5 peers
+        assertTrue(n.sumOf { it.transmissions } <= 6 * 5)
     }
 
     @Test fun duplicatesAreDropped() {
@@ -62,10 +62,9 @@ class RelayTest {
         val e = RelayEngine({ emptySet() }, cacheCapacity = 10, cacheTtlMs = 1000)
         for (i in 0 until 100) e.onReceive(pkt("%016x".format(i), "ff00000000000000", 4).encode(), i.toLong())
         assertEquals(10, e.cacheSize)
-        // oldest entries were evicted: an old id is forwarded again instead of dropped
         assertTrue(e.onReceive(pkt("%016x".format(0), "ff00000000000000", 4).encode(), 200) is RelayDecision.Forward)
         e.onReceive(pkt("%016x".format(777), "ff00000000000000", 4).encode(), 5000)
-        assertEquals(1, e.cacheSize) // everything older than the TTL was purged
+        assertEquals(1, e.cacheSize)
     }
 
     @Test fun ownOriginatedPacketIsNotForwardedBack() {

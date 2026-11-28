@@ -1,6 +1,5 @@
 package dev.kelian.mesh.core.protocol
 
-/** Minimal JSON parser (objects, arrays, strings, numbers, booleans, null) so tests need no dependency. */
 class MiniJson(private val s: String) {
     private var i = 0
 

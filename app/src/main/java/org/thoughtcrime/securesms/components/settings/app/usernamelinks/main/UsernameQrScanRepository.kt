@@ -30,6 +30,10 @@ object UsernameQrScanRepository {
    * Given a URL, will attempt to lookup the username, coercing it to a standard set of [QrScanResult]s.
    */
   fun lookupUsernameUrl(url: String): Single<QrScanResult> {
+    if (dev.kelian.mesh.app.MeshQr.isMeshLink(url)) {
+      return Single.fromCallable { dev.kelian.mesh.app.MeshQr.handleScan(org.thoughtcrime.securesms.dependencies.AppDependencies.application, url) }
+        .subscribeOn(Schedulers.io())
+    }
     return UsernameRepository.fetchUsernameAndAciFromLink(url)
       .map { result ->
         when (result) {

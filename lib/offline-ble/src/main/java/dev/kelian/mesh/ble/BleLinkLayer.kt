@@ -33,17 +33,14 @@ import dev.kelian.mesh.core.protocol.shouldConnectMesh
 import dev.kelian.mesh.core.protocol.toHex
 import java.security.SecureRandom
 
-/** Events from the radio, all delivered on the layer's handler thread (see [BleLinkLayer.post]). */
 interface LinkListener {
-    /** A link is usable. [maxFrame] = largest frame (ATT payload) the link accepts. */
+
     fun onLinkUp(linkId: String, maxFrame: Int)
     fun onLinkDown(linkId: String)
     fun onFrame(linkId: String, frame: ByteArray)
 
-    /** True while something waits to be sent or relayed: only then may we open connections. */
     fun wantsConnection(): Boolean
 
-    /** Called every ~2 s on the layer thread (watchdogs, housekeeping). */
     fun onTick()
 }
 
@@ -57,14 +54,6 @@ data class LayerStatus(
     val peersSeen: Int = 0,
 )
 
-/**
- * BLE link layer: every phone is GATT peripheral (advertise + server) and GATT central (scan + client)
- * at once. It only moves frames: fragmentation, ACKs, relay and messages live in the core.
- * All state is touched on one handler thread; Bluetooth callbacks copy their arguments and post to it.
- *
- * Privacy: the advertisement carries only the service UUID. The INFO characteristic holds a random id
- * regenerated at every start, used to recognise ourselves; no stable identifier is ever exposed.
- */
 @SuppressLint("MissingPermission")
 @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
 class BleLinkLayer(
@@ -100,10 +89,7 @@ class BleLinkLayer(
     private val ignoreUntil = HashMap<String, Long>()
     private var lastScanStart = 0L
 
-    /** Runs [block] on the layer thread: the only thread allowed to touch the core engine. */
     fun post(block: () -> Unit) { h.post(block) }
-
-    // ---------------------------------------------------------------- lifecycle
 
     fun start() {
         h.post {
@@ -190,9 +176,6 @@ class BleLinkLayer(
         receiverRegistered = false
     }
 
-    // ---------------------------------------------------------------- public link API
-
-    /** Sends one frame on a link (ids come from [LinkListener.onLinkUp]). Safe from any thread. */
     fun send(linkId: String, frame: ByteArray, onDone: ((Boolean) -> Unit)? = null) {
         h.post {
             val l = findLink(linkId)
@@ -200,7 +183,6 @@ class BleLinkLayer(
         }
     }
 
-    /** Cuts a link that stopped answering; it is re-established by the normal scan/connect cycle. */
     fun dropLink(linkId: String) {
         h.post {
             when (val l = findLink(linkId)) {
@@ -208,15 +190,13 @@ class BleLinkLayer(
                 is ServerLink -> try { server?.cancelConnection(l.device) } catch (_: Exception) {}
                 else -> {}
             }
-            // Fresh scan: gives the stack a clean start after a stall.
+
             if (started && adapterEnabled()) { stopScan(); startScan() }
         }
     }
 
     private fun findLink(id: String): Link? =
         if (id.startsWith("cli:")) clientLinks[id.removePrefix("cli:")] else if (id.startsWith("srv:")) serverLinks[id.removePrefix("srv:")] else null
-
-    // ---------------------------------------------------------------- GATT server (peripheral role)
 
     private fun openServer() {
         val srv = manager.openGattServer(ctx, serverCb)
@@ -334,8 +314,6 @@ class BleLinkLayer(
         }
     }
 
-    // ---------------------------------------------------------------- advertising
-
     private val advCb = object : AdvertiseCallback() {
         override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
             h.post { advertising = true; log.i("adv", "advertising started"); publish() }
@@ -367,7 +345,7 @@ class BleLinkLayer(
             .setConnectable(true)
             .setTimeout(0)
             .build()
-        // Only the service UUID goes into the advertisement (iOS background limitation, and no stable id).
+
         val data = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .setIncludeTxPowerLevel(false)
@@ -384,8 +362,6 @@ class BleLinkLayer(
         try { manager.adapter?.bluetoothLeAdvertiser?.stopAdvertising(advCb) } catch (_: Exception) {}
         advertising = false
     }
-
-    // ---------------------------------------------------------------- scanning (central role)
 
     private val scanCb = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
@@ -449,8 +425,6 @@ class BleLinkLayer(
         if (rssi != null) rssis[addr] = rssi
         lastSeen[addr] = System.currentTimeMillis()
     }
-
-    // ---------------------------------------------------------------- links
 
     private abstract inner class Link(val key: String) {
         var mtu = 23
@@ -578,8 +552,6 @@ class BleLinkLayer(
         }
     }
 
-    // ---- low level helpers (API 33 introduced value-carrying overloads)
-
     private fun writeChar(g: BluetoothGatt, c: BluetoothGattCharacteristic, v: ByteArray): Boolean {
         return if (Build.VERSION.SDK_INT >= 33) {
             g.writeCharacteristic(c, v, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) == BluetoothStatusCodes.SUCCESS
@@ -608,14 +580,12 @@ class BleLinkLayer(
         }
     }
 
-    // ---- client connection state machine: connect -> MTU -> discover -> read INFO -> subscribe TX -> ready
-
     private fun maybeConnect(dev: BluetoothDevice) {
         if (!started || !adapterEnabled()) return
         val addr = dev.address
         val now = System.currentTimeMillis()
         if (clientLinks.containsKey(addr)) return
-        // On demand: detection alone never opens a connection; only queued or relayable data does.
+
         if (!shouldConnectMesh(
                 listener.wantsConnection(), clientLinks.size, now,
                 nextConnectAt[addr] ?: 0L, ignoreUntil[addr] ?: 0L,
@@ -647,8 +617,7 @@ class BleLinkLayer(
         if (newState == BluetoothProfile.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
             val inboundMtu = serverLinks[link.key]?.mtu ?: 23
             if (inboundMtu > 23) {
-                // The ATT MTU is per connection and was already negotiated by the inbound link: asking
-                // again is useless and its callback may never come (it cut a working link once).
+
                 link.mtu = minOf(inboundMtu, REQUESTED_MTU)
                 link.ops.enqueue("discoverServices") { g.discoverServices() }
             } else {
@@ -732,7 +701,7 @@ class BleLinkLayer(
         if (link.closed) return
         log.i("gatt-c", "dropping link: $reason")
         try { link.gatt?.disconnect() } catch (_: Exception) {}
-        // The disconnect callback normally closes the link; make sure it happens.
+
         h.postDelayed({ closeClient(link) }, 2000)
     }
 
@@ -765,15 +734,12 @@ class BleLinkLayer(
         publish()
     }
 
-    /** Called when data became pending: try the peers detected recently (the policy decides). */
     fun connectNow() {
         h.post {
             val now = System.currentTimeMillis()
             for ((addr, dev) in devices.entries.toList()) if (now - (lastSeen[addr] ?: 0L) < 30_000) maybeConnect(dev)
         }
     }
-
-    // ---------------------------------------------------------------- housekeeping
 
     private val housekeeping = object : Runnable {
         override fun run() {

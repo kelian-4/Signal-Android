@@ -9,7 +9,6 @@ import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 
-/** Runtime permissions the mesh needs, by Android version. */
 object BlePermissions {
     fun required(): Array<String> {
         val list = ArrayList<String>()
@@ -24,16 +23,17 @@ object BlePermissions {
         return list.toTypedArray()
     }
 
+    fun bluetoothMissing(ctx: Context): List<String> =
+        missing(ctx).filter { !it.endsWith("POST_NOTIFICATIONS") }
+
     fun missing(ctx: Context): List<String> =
         required().filter { ctx.checkSelfPermission(it) != android.content.pm.PackageManager.PERMISSION_GRANTED }
 }
 
-/** Without the exemption, aggressive battery savers kill the radio in the background. */
 object BatteryOptimization {
     fun isExempt(ctx: Context): Boolean =
         (ctx.getSystemService(Context.POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(ctx.packageName)
 
-    /** Intent to start from an activity: shows the system dialog asking to exempt this app. */
     @SuppressLint("BatteryLife")
     fun requestIntent(ctx: Context): Intent =
         Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${ctx.packageName}"))

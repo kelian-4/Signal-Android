@@ -257,7 +257,6 @@ android {
     versionCode = (canonicalVersionCode * maxHotfixVersions) + possibleHotfixVersions[currentHotfixVersion]
     versionName = canonicalVersionName
 
-    // Own identity: this fork must not share its package name with Signal.
     applicationId = "app.messagerie.mesh"
 
     if (isInstrumentationTestRun) {
@@ -324,8 +323,6 @@ android {
     buildConfigField("boolean", "TRACING_ENABLED", "false")
     buildConfigField("boolean", "LINK_DEVICE_UX_ENABLED", "false")
 
-    // One architecture by default (arm64-v8a covers almost every phone made since 2017): a 4-ABI build is
-    // ~4x bigger. Pass -PmeshAbi=x86_64 for Waydroid/emulators, or -PmeshAllAbis for every architecture plus a universal APK.
     val meshAbis = when {
       project.hasProperty("meshAllAbis") -> listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
       project.hasProperty("meshAbi") -> listOf(project.property("meshAbi").toString())
@@ -335,12 +332,10 @@ android {
     ndk {
       abiFilters += meshAbis
     }
-    // Test builds ship French and English only (the target audience); -PmeshAllLanguages keeps every translation.
     resourceConfigurations += if (project.hasProperty("meshAllLanguages")) listOf() else listOf("fr", "en")
 
     splits {
       abi {
-        // A single architecture is selected by the ndk abiFilters above (one APK); splits are only for -PmeshAllAbis.
         isEnable = project.hasProperty("meshAllAbis") && !project.hasProperty("generateBaselineProfile")
         reset()
         include(*meshAbis.toTypedArray())
@@ -396,7 +391,6 @@ android {
     getByName("release") {
       isMinifyEnabled = true
       isShrinkResources = true
-      // Sideloaded test builds: signed with the repository's debug key (there is no release keystore here).
       if (debugKeystorePropertiesProvider.orNull != null) {
         signingConfig = signingConfigs["debug"]
       }

@@ -2,12 +2,10 @@ package dev.kelian.mesh.core.protocol
 
 import java.util.Locale
 
-/** One auto-test message. [state] is "pending", "sent" or "acked". */
 class CsvRow(val msgId: String, val createdMs: Long, val state: String, val latencyMs: Long?)
 
 const val CSV_HEADER = "msg_id,created_ms,state,latency_ms"
 
-/** CSV export of an auto-test run: rows sorted by creation time, then a '#' summary line. */
 fun buildCsv(rows: List<CsvRow>): String {
     val sorted = rows.sortedBy { it.createdMs }
     val sb = StringBuilder(CSV_HEADER).append('\n')

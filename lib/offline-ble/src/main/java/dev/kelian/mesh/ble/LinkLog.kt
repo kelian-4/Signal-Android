@@ -2,7 +2,6 @@ package dev.kelian.mesh.ble
 
 import android.util.Log
 
-/** Where link-layer log lines go. Never receives message content, only link events. */
 fun interface LinkLog {
     fun log(level: Char, tag: String, msg: String)
 

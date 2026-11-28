@@ -1,6 +1,5 @@
 package dev.kelian.mesh.core.protocol
 
-/** Auto-test statistics. Latencies are in ms; stats are null when nothing was acknowledged. */
 class LatencyStats(val min: Long?, val median: Long?, val max: Long?, val deliveryRatio: Double)
 
 fun computeStats(latenciesMs: List<Long>, sent: Int): LatencyStats {

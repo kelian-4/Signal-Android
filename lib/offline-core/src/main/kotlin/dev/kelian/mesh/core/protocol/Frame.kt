@@ -1,6 +1,5 @@
 package dev.kelian.mesh.core.protocol
 
-/** Constants of the BLE test protocol v1 (see spec/PROTOCOL.md). */
 const val PROTOCOL_VERSION = 1
 const val TYPE_TEXT = 0x01
 const val TYPE_ACK = 0x02
@@ -24,7 +23,6 @@ fun String.hexToBytes(): ByteArray {
     return ByteArray(length / 2) { i -> ((this[2 * i].digitToInt(16) shl 4) or this[2 * i + 1].digitToInt(16)).toByte() }
 }
 
-/** One BLE frame: 14-byte big-endian header followed by the payload. */
 class Frame(
     val type: Int,
     val msgId: ByteArray,
@@ -47,7 +45,6 @@ class Frame(
     }
 
     companion object {
-        /** Returns null when the frame is invalid (and must be ignored). */
         fun decode(data: ByteArray): Frame? {
             if (data.size < HEADER_SIZE) return null
             val version = data[0].toInt() and 0xFF
@@ -66,7 +63,6 @@ class Frame(
     }
 }
 
-/** Cuts [payload] into frames that each fit in [maxFrameSize] bytes. */
 fun fragment(payload: ByteArray, maxFrameSize: Int, msgId: ByteArray, type: Int = TYPE_TEXT): List<Frame> {
     val chunk = maxFrameSize - HEADER_SIZE
     require(chunk >= 1) { "maxFrameSize too small" }

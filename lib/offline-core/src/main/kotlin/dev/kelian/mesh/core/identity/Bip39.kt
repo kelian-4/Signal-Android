@@ -2,7 +2,6 @@ package dev.kelian.mesh.core.identity
 
 import java.security.MessageDigest
 
-/** BIP-39 (English) for 256-bit entropy: 24 words = 256 bits + 8 checksum bits. */
 object Bip39 {
     val wordlist: List<String> by lazy {
         val text = Bip39::class.java.getResourceAsStream("/bip39-english.txt")!!.bufferedReader().readText()
@@ -19,7 +18,6 @@ object Bip39 {
         return List(24) { wordlist[bits.substring(it * 11, it * 11 + 11).toInt(2)] }
     }
 
-    /** Throws [IllegalArgumentException] on an unknown word, wrong length or bad checksum. */
     fun decode(words: List<String>): ByteArray {
         require(words.size == 24) { "expected 24 words" }
         val bits = StringBuilder()

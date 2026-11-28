@@ -27,12 +27,6 @@ import java.io.DataOutputStream
 import java.io.File
 import java.security.SecureRandom
 
-/**
- * Double Ratchet sessions (libsignal, PQXDH) without any server: the prekey bundle that Signal would fetch
- * from its server is exchanged in person ([publishBundle] / [acceptPeerBundle], carried as QR or close-range BLE).
- * Peers are addressed by the hex of their identity public key, device 1. State is snapshotted to [stateFile].
- * Not thread-safe: call it from the radio thread only.
- */
 class LibsignalSessionCipher(
     private val identity: LibsignalIdentity,
     private val stateFile: File? = null,
@@ -49,9 +43,6 @@ class LibsignalSessionCipher(
 
     private fun address(peerPk: ByteArray) = SignalProtocolAddress(peerPk.toHex(), DEVICE_ID)
 
-    // ---------------------------------------------------------------- offline prekey exchange
-
-    /** A fresh bundle to show to a contact: one one-time prekey, one signed prekey, one post-quantum prekey. */
     fun publishBundle(): PreKeyBundle {
         val priv = identity.identityKeyPair.privateKey
         val preKeyId = random.nextInt(0xFFFFFF) + 1
@@ -71,11 +62,6 @@ class LibsignalSessionCipher(
         return PreKeyBundle.create(identity, signedId, signed.publicKey.serialize(), listOf(preKeyId to pre.publicKey.serialize()), extra)
     }
 
-    /**
-     * Builds the session towards the bundle's owner. The bundle must come from
-     * [PreKeyBundle.parse] with [LibsignalSignatures], so its signature is already checked.
-     * Throws if libsignal refuses it (e.g. UntrustedIdentityException when the key changed).
-     */
     fun acceptPeerBundle(bundle: PreKeyBundle) {
         require(bundle.oneTimePreKeys.isNotEmpty()) { "bundle has no one-time prekey" }
         val ex = decodeExtra(bundle.extra)
@@ -91,7 +77,17 @@ class LibsignalSessionCipher(
         persist()
     }
 
-    // ---------------------------------------------------------------- SessionCipher
+    override fun bundleText(): String? = publishBundle().encode()
+
+    override fun acceptBundleText(text: String): Boolean {
+        val bundle = PreKeyBundle.parse(text, LibsignalSignatures) ?: return false
+        return try {
+            acceptPeerBundle(bundle)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
 
     override fun canEncrypt(peerPk: ByteArray): Boolean = store.containsSession(address(peerPk))
 
@@ -120,7 +116,6 @@ class LibsignalSessionCipher(
         null
     }
 
-    /** Contact requests are sealed (HPKE) to the recipient's identity key: only its owner can open them. */
     override fun seal(recipientPk: ByteArray, plain: ByteArray): ByteArray =
         ECPublicKey(recipientPk).seal(plain, REQUEST_INFO)
 
@@ -129,8 +124,6 @@ class LibsignalSessionCipher(
     } catch (e: Exception) {
         null
     }
-
-    // ---------------------------------------------------------------- persistence (sessions survive a restart)
 
     private class Extra(val signedPreKeySignature: ByteArray, val kyberId: Int, val kyberPublic: ByteArray, val kyberSignature: ByteArray)
 
@@ -173,7 +166,7 @@ class LibsignalSessionCipher(
             tmp.writeBytes(bo.toByteArray())
             if (!tmp.renameTo(f)) { f.delete(); tmp.renameTo(f) }
         } catch (e: Exception) {
-            // best effort: a failed snapshot only means sessions are renegotiated after a restart
+
         }
     }
 
@@ -195,7 +188,7 @@ class LibsignalSessionCipher(
             repeat(i.readInt()) { val id = i.readInt(); val b = ByteArray(i.readInt()).also { i.readFully(it) }; store.storeSignedPreKey(id, SignedPreKeyRecord(b)); signedPreKeyIds.add(id) }
             repeat(i.readInt()) { val id = i.readInt(); val b = ByteArray(i.readInt()).also { i.readFully(it) }; store.storeKyberPreKey(id, KyberPreKeyRecord(b)); kyberPreKeyIds.add(id) }
         } catch (e: Exception) {
-            // unreadable snapshot: start without sessions, they are renegotiated
+
         }
     }
 

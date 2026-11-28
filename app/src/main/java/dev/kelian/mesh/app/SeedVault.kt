@@ -10,10 +10,6 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-/**
- * Keeps the 32-byte identity seed on the phone only, encrypted with a key that never leaves the
- * Android Keystore. The seed is what the 24-word recovery phrase encodes.
- */
 object SeedVault {
     private const val ALIAS = "mesh_identity_wrap"
     private const val FILE = "identity.bin"
@@ -43,7 +39,6 @@ object SeedVault {
         File(ctx.filesDir, FILE).writeBytes(byteArrayOf(iv.size.toByte()) + iv + ct)
     }
 
-    /** Null if there is no identity yet or the file cannot be decrypted. */
     fun load(ctx: Context): ByteArray? = try {
         val f = File(ctx.filesDir, FILE)
         if (!f.exists()) null else {

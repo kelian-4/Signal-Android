@@ -20,7 +20,6 @@ import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-/** TEST-ONLY cipher (keys derived from public keys, NOT secure). Real builds plug libsignal sessions in here. */
 class FakeCipher(private val ownPk: ByteArray) : SessionCipher {
     private val rnd = SecureRandom()
     private fun key(vararg parts: ByteArray) = SecretKeySpec(MessageDigest.getInstance("SHA-256").digest(parts.reduce { a, b -> a + b }), "AES")
@@ -40,12 +39,11 @@ class FakeCipher(private val ownPk: ByteArray) : SessionCipher {
     override fun open(data: ByteArray) = dec(key("seal".toByteArray(), ownPk), data)
 }
 
-/** Simulated radio: frames go through a queue; a link can be frozen (frames silently lost). */
 class SimRadio {
     class Port(val engine: () -> MeshEngine, val remoteLink: String)
     val clock = longArrayOf(1_000_000L)
     private val queue = ArrayDeque<Triple<() -> MeshEngine, String, ByteArray>>()
-    private val ports = HashMap<String, Port>() // "<engineName>/<linkId>"
+    private val ports = HashMap<String, Port>()
     val frozen = HashSet<String>()
     var frames = 0
 
@@ -75,7 +73,6 @@ class MeshEngineTest {
         return MeshEngine(id, name, FakeCipher(id.publicKey), radio.sinkFor(name), { radio.clock[0] })
     }
 
-    /** In-person QR exchange: scan, signature check, challenge-response, then "verified". */
     private fun meetAndVerify(a: MeshEngine, aId: String, b: MeshEngine, bId: String) {
         val now = radio.clock[0]
         val qrB = QrPayload.parse(QrPayload.create(b.identity, b.nickname, now).encode(), now)!!
@@ -93,13 +90,11 @@ class MeshEngineTest {
         val ida = Identity.generate(); val idb = Identity.generate()
         lateinit var a: MeshEngine; lateinit var b: MeshEngine
         radio = SimRadio(); a = engine("Alice", ida); b = engine("Bob", idb)
-        // 1. identities exist without number/e-mail; 2. add each other by QR; badge only after the in-person proof
         val qrB = QrPayload.parse(QrPayload.create(idb, "Bob", radio.clock[0]).encode(), radio.clock[0])!!
         a.addContact("bob", qrB)
         assertEquals(TrustLevel.UNVERIFIED, a.trust.level("bob"))
         meetAndVerify(a, "alice", b, "bob")
         assertEquals(TrustLevel.VERIFIED, a.trust.level("bob")); assertEquals(TrustLevel.VERIFIED, b.trust.level("alice"))
-        // 3. encrypted one-to-one text over the (simulated) link, end-to-end ACK
         radio.connect("Alice", { a }, "L", "Bob", { b }, "L")
         val sent = a.sendText("bob", "Salut Bob, tu es là ?") as SendResult.Queued
         radio.run()
@@ -107,11 +102,9 @@ class MeshEngineTest {
         assertEquals("Salut Bob, tu es là ?", got.text); assertEquals("alice", got.contactId)
         assertTrue(a.events.filterIsInstance<MeshEvent.Delivered>().any { it.msgIdHex == sent.msgIdHex })
         assertEquals(0, a.pendingCount())
-        // 4. key change: Bob reinstalls with a new identity -> alert, badge removed
         a.onAuthenticatedKey("bob", Identity.generate().publicKey)
         assertEquals(1, a.events.filterIsInstance<MeshEvent.KeyChanged>().size)
         assertEquals(TrustLevel.UNVERIFIED, a.trust.level("bob"))
-        // 5. identity restored from the 24-word phrase; 6. backup export/import (history yes, verification kept, sessions none)
         val restored = Identity.fromPhrase(ida.recoveryPhrase())
         assertEquals(ida.publicKey.toHex(), restored.publicKey.toHex())
         val file = b.exportBackup(idb.recoveryPhrase(), fast)
@@ -136,7 +129,7 @@ class MeshEngineTest {
         meetAndVerify(a, "a", b, "b")
         radio.connect("A", { a }, "L", "B", { b }, "L")
         val id = (a.sendText("b", "une fois") as SendResult.Queued).msgIdHex
-        radio.frozen.add("B/L") // B's answers are lost: the end-to-end ACK never arrives
+        radio.frozen.add("B/L")
         radio.run()
         assertEquals(1, a.pendingCount())
         radio.frozen.clear(); a.flush(); radio.run()
@@ -151,7 +144,7 @@ class MeshEngineTest {
         a.sendText("b", "via C"); radio.run()
         assertEquals("via C", b.events.filterIsInstance<MeshEvent.Text>().single().text)
         assertTrue(c.events.isEmpty())
-        assertEquals(0, a.pendingCount()) // the delivery ACK came back through the relay
+        assertEquals(0, a.pendingCount())
     }
 
     @Test fun contactRequestIsOneShortPlainText() {
@@ -177,7 +170,6 @@ class MeshEngineTest {
         val repair = a.events.filterIsInstance<MeshEvent.LinkRepair>().single()
         assertEquals("L", repair.linkId); assertTrue(repair.stale >= 27)
         assertEquals(27, a.pendingCount())
-        // radio layer reconnects: everything pending is re-sent and finally acknowledged
         radio.frozen.clear(); a.onLinkDown("L"); a.onLinkUp("L"); radio.run()
         assertEquals(27, b.events.filterIsInstance<MeshEvent.Text>().size); assertEquals(0, a.pendingCount())
     }
@@ -205,7 +197,7 @@ class MeshEngineTest {
         meetAndVerify(a, "a", b, "b")
         radio.connect("A", { a }, "toC", "C", { c }, "toA")
         a.sendText("b", "arrive plus tard"); radio.run()
-        assertTrue(c.wantsConnection()) // C holds a packet it cannot forward yet: it should open a link
+        assertTrue(c.wantsConnection())
         assertEquals(0, b.events.size)
         radio.connect("C", { c }, "toB", "B", { b }, "toC"); radio.run()
         assertEquals("arrive plus tard", b.events.filterIsInstance<MeshEvent.Text>().single().text)
@@ -220,7 +212,7 @@ class MeshEngineTest {
         a.onLinkDown("L"); b.onLinkDown("L"); a.onLinkUp("L", 20); b.onLinkUp("L", 20)
         val before = radio.frames
         a.sendText("b", long); radio.run()
-        assertTrue(radio.frames - before > 40) // 900+ bytes in 20-byte frames
+        assertTrue(radio.frames - before > 40)
         assertEquals(long, b.events.filterIsInstance<MeshEvent.Text>().single().text)
     }
 
@@ -241,5 +233,52 @@ class MeshEngineTest {
         a.addContact("o", QrPayload.parse(QrPayload.create(other, "O", radio.clock[0]).encode(), radio.clock[0])!!)
         assertTrue(a.sendText("o", "x") is SendResult.NoSession)
         assertEquals(0, a.pendingCount())
+    }
+
+    private class BundleCipher(private val ownPk: ByteArray) : SessionCipher by FakeCipher(ownPk) {
+        val ready = HashSet<String>()
+        override fun canEncrypt(peerPk: ByteArray) = peerPk.toHex() in ready
+        override fun bundleText() = "bundle:" + ownPk.toHex()
+        override fun acceptBundleText(text: String): Boolean {
+            if (!text.startsWith("bundle:")) return false
+            ready.add(text.removePrefix("bundle:")); return true
+        }
+        override fun decrypt(peerPk: ByteArray, data: ByteArray): ByteArray? { ready.add(peerPk.toHex()); return FakeCipher(ownPk).decrypt(peerPk, data) }
+    }
+
+    @Test fun oneQrScanSetsUpTheSessionInBothDirectionsOverTheMesh() {
+        radio = SimRadio()
+        val ia = Identity.generate(); val ib = Identity.generate()
+        val a = MeshEngine(ia, "Alice", BundleCipher(ia.publicKey), radio.sinkFor("A"), { radio.clock[0] })
+        val b = MeshEngine(ib, "Bob", BundleCipher(ib.publicKey), radio.sinkFor("B"), { radio.clock[0] })
+        radio.connect("A", { a }, "L", "B", { b }, "L")
+        val qrB = QrPayload.parse(QrPayload.create(ib, "Bob", radio.clock[0]).encode(), radio.clock[0])!!
+        a.addContact(ib.publicKey.toHex(), qrB)
+        assertTrue(a.sendText(ib.publicKey.toHex(), "trop tôt") is SendResult.NoSession)
+        assertTrue(a.requestBundle(ib.publicKey.toHex()))
+        radio.run()
+        assertEquals(ia.publicKey.toHex(), b.events.filterIsInstance<MeshEvent.ContactAppeared>().single().contactId)
+        assertEquals("Alice", b.contact(ia.publicKey.toHex())!!.nickname)
+        assertEquals(1, a.events.filterIsInstance<MeshEvent.SessionReady>().size)
+        assertEquals(1, b.events.filterIsInstance<MeshEvent.SessionReady>().size)
+        assertTrue(a.sendText(ib.publicKey.toHex(), "salut Bob") is SendResult.Queued)
+        radio.run()
+        assertEquals("salut Bob", b.events.filterIsInstance<MeshEvent.Text>().single().text)
+        assertTrue(b.sendText(ia.publicKey.toHex(), "salut Alice") is SendResult.Queued)
+        radio.run()
+        assertEquals("salut Alice", a.events.filterIsInstance<MeshEvent.Text>().single().text)
+    }
+
+    @Test fun bundlesAreOnlyAcceptedFromKnownContacts() {
+        radio = SimRadio()
+        val ia = Identity.generate(); val ib = Identity.generate(); val im = Identity.generate()
+        val ca = BundleCipher(ia.publicKey)
+        val a = MeshEngine(ia, "Alice", ca, radio.sinkFor("A"), { radio.clock[0] })
+        val m = MeshEngine(im, "Mallory", BundleCipher(im.publicKey), radio.sinkFor("M"), { radio.clock[0] })
+        radio.connect("A", { a }, "L", "M", { m }, "L")
+        m.addContactKey(ia.publicKey.toHex(), ia.publicKey, "Alice")
+        m.requestBundle(ia.publicKey.toHex()); radio.run()
+        assertFalse(ca.ready.contains(im.publicKey.toHex()) && a.events.none { it is MeshEvent.ContactAppeared })
+        assertTrue(a.events.filterIsInstance<MeshEvent.ContactAppeared>().size <= 1)
     }
 }

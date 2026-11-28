@@ -11,10 +11,6 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 
-/**
- * Foreground service (type connectedDevice) that keeps the BLE radio alive while the app is in the
- * background. Needs the Bluetooth runtime permissions to be granted before it is started.
- */
 class BleForegroundService : Service() {
     override fun onCreate() {
         super.onCreate()

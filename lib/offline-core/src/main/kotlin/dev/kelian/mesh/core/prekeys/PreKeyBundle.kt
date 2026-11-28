@@ -9,15 +9,10 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.util.Base64
 
-/**
- * Offline replacement for the server's prekey upload: a bundle shown as QR code or sent over close-range
- * BLE. The libsignal key material is carried as opaque bytes ([signedPreKey], [oneTimePreKeys]); the
- * identity key signs them, so a relay or an eavesdropper cannot swap them.
- */
 class PreKeyBundle(
     val identityKey: ByteArray, val signedPreKeyId: Int, val signedPreKey: ByteArray,
     val oneTimePreKeys: List<Pair<Int, ByteArray>>, val signature: ByteArray,
-    /** Extra opaque key material covered by the signature (libsignal's post-quantum prekey and its own signature). */
+
     val extra: ByteArray = ByteArray(0),
 ) {
     fun encode(): String {
@@ -44,7 +39,6 @@ class PreKeyBundle(
             return PreKeyBundle(signer.publicKey, spkId, spk, otks, signer.sign(signedBytes(signer.publicKey, spkId, spk, otks, extra)), extra)
         }
 
-        /** Null if malformed or if the signature does not match the embedded identity key. */
         fun parse(text: String, verifier: SignatureVerifier = Ed25519): PreKeyBundle? = runCatching {
             val i = DataInputStream(ByteArrayInputStream(Base64.getUrlDecoder().decode(text)))
             if (i.readUnsignedByte() != 2) return null

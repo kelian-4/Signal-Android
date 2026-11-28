@@ -9,11 +9,6 @@ import dev.kelian.mesh.core.identity.IdentitySigner
 import dev.kelian.mesh.core.outbox.FileOutboxStore
 import java.io.File
 
-/**
- * Glues the pure-Kotlin [MeshEngine] to the BLE radio. The engine is not thread-safe, so every call
- * into it goes through [post], which runs on the radio thread. Events are handed to [onEvent] on that
- * same thread; the UI must hop to the main thread itself.
- */
 class MeshRuntime(
     context: Context,
     identity: IdentitySigner,
@@ -51,7 +46,6 @@ class MeshRuntime(
     fun start() { layer.start() }
     fun stop() { layer.stop() }
 
-    /** Runs [block] with the engine on the radio thread, then delivers the events it produced. */
     fun post(block: (MeshEngine) -> Unit) {
         layer.post {
             block(engine)
@@ -60,7 +54,6 @@ class MeshRuntime(
         }
     }
 
-    /** Called on the radio thread: dead links are cut so that the normal cycle re-establishes them. */
     private fun drain() {
         if (engine.events.isEmpty()) return
         val batch = engine.events.toList()
@@ -75,7 +68,6 @@ class MeshRuntime(
     }
 }
 
-/** Process-wide holder: the application sets the runtime once the identity exists; the service runs it. */
 object MeshHost {
     @Volatile var runtime: MeshRuntime? = null
     @Volatile var notificationTitle: String = "Messagerie hors ligne active"

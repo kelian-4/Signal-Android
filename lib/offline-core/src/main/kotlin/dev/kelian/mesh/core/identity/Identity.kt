@@ -11,22 +11,17 @@ import java.security.spec.EdECPoint
 import java.security.spec.EdECPublicKeySpec
 import java.security.spec.NamedParameterSpec
 
-/**
- * Signature primitive used for identity, QR codes and challenge-response. On Android this interface
- * is implemented with libsignal's identity key; the JDK implementation below backs the unit tests.
- */
 interface IdentitySigner {
     val publicKey: ByteArray
     fun sign(message: ByteArray): ByteArray
 }
 
-/** Signature check used for QR codes, challenges and prekey bundles. Android plugs libsignal's XEd25519 here. */
 fun interface SignatureVerifier {
     fun verify(publicKey: ByteArray, message: ByteArray, signature: ByteArray): Boolean
 }
 
 object Ed25519 : SignatureVerifier {
-    /** Verifies [signature] over [message] with a raw 32-byte public key. Never throws. */
+
     override fun verify(publicKey: ByteArray, message: ByteArray, signature: ByteArray): Boolean = runCatching {
         if (publicKey.size != 32 || signature.size != 64) return false
         val s = Signature.getInstance("Ed25519")
@@ -52,7 +47,6 @@ object Ed25519 : SignatureVerifier {
     }
 }
 
-/** Device identity: a 32-byte seed (the thing the 24-word phrase encodes) and its key pair. No phone number, no e-mail. */
 class Identity private constructor(val seed: ByteArray, private val pair: KeyPair) : IdentitySigner {
     override val publicKey: ByteArray = pair.public.encoded.let { it.copyOfRange(it.size - 32, it.size) }
 
